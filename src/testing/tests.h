@@ -18,34 +18,36 @@
 #include "../client/client.h"
 #include "../server/server.h"
 
-class tests {
+class client_runner {
     std::thread thread;
 
 public:
-    client nested_client; // todo: init
+    client nested_client;
 
-    tests(int id, const server &server, const std::atomic<bool> &started) : thread([this, &started]() {
-        const double mean = .2;
-        const double variance = .15;
-        std::uniform_real_distribution<double> dice(0, 1);
-        std::uniform_real_distribution<double> sleep_rand(mean - variance, mean + variance);
-        std::uniform_int_distribution<int> change_type_rand(0, 2);
-        std::uniform_int_distribution<int> new_val_rand(INT_MIN, INT_MAX);
-        std::default_random_engine rand_engine;
+    client_runner(int id, server &server, const std::atomic<bool> &started) : nested_client(server) {
+        thread = std::thread([this, &started]() {
+            const double mean = .2;
+            const double variance = .15;
+            std::uniform_real_distribution<double> dice(0, 1);
+            std::uniform_real_distribution<double> sleep_rand(mean - variance, mean + variance);
+            std::uniform_int_distribution<int> change_type_rand(0, 2);
+            std::uniform_int_distribution<int> new_val_rand(INT_MIN, INT_MAX);
+            std::default_random_engine rand_engine;
 
-        while (started) {
-            Sleep(sleep_rand(rand_engine));
+//        nested_client.connect();
 
-            int pos = (int) (dice(rand_engine) * nested_client.doc.size());
-            change change(
-                    static_cast<change_type>(change_type_rand(rand_engine)),
-                    new_val_rand(rand_engine)
-            );
+            while (started) {
+                Sleep(sleep_rand(rand_engine));
 
-            nested_client.apply_change(pos, change);
-        }
-    }) {
+                int pos = (int) (dice(rand_engine) * nested_client.doc->size());
+                change change(
+                        static_cast<change_type>(change_type_rand(rand_engine)),
+                        new_val_rand(rand_engine)
+                );
 
+                nested_client.apply_change(pos, change);
+            }
+        });
     }
 
     void join() {
@@ -54,21 +56,21 @@ public:
 };
 
 // todo: pass delay in argument?
-std::vector<tests> start_n_clients(
-        const int &clientsNum, const server &server, const std::atomic<bool> &started_flag
+std::vector<client_runner> start_n_clients(
+        const int &clientsNum, server &server, const std::atomic<bool> &started_flag
 ) {
-    std::vector<tests> clients;
+    std::vector<client_runner> clients;
     for (int i = 0; i < clientsNum; i++) {
         clients.emplace_back(i, server, started_flag);
     }
     return clients;
 }
 
-void check_consistency(const server &server, const std::vector<tests> &clients) {
+void check_consistency(const server &server, const std::vector<client_runner> &clients) {
     int server_hash = server.doc.hash();
     int inconsistent_clients = std::accumulate(clients.begin(), clients.end(), 0,
-                                               [&server_hash](const tests &client) {
-                                                   return client.nested_client.doc.hash() != server_hash;
+                                               [&server_hash](const client_runner &client) {
+                                                   return client.nested_client.doc->hash() != server_hash;
                                                });
     if (inconsistent_clients) {
         throw std::runtime_error(
@@ -86,7 +88,7 @@ void test() {
 
     Sleep(30000);
     started = false;
-    std::for_each(clients.begin(), clients.end(), [](const tests &client) { client.join() });
+    std::for_each(clients.begin(), clients.end(), [](client_runner &client) { client.join(); });
 
     check_consistency(serv, clients);
 }

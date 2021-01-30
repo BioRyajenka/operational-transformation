@@ -3,3 +3,7 @@
 //
 
 #include "document.h"
+
+document::document(const document &rhs) {
+
+}

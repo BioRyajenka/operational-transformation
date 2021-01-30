@@ -13,10 +13,16 @@
 class operation {
     // todo: list of changes
 
-    // todo: pointer to operation maybe?
-    std::pair<operation, operation> transform(const operation &rhs);
+public:
+    operation(const int &pos, const change &change);
 
-    void apply_to(const document &doc);
+    int hash() const; // only for validation purposes
+
+    // todo: pointer to operation maybe?
+    /**
+     * for (this, rhs) returns (rhs', this')
+     */
+    std::pair<std::shared_ptr<operation>, std::shared_ptr<operation>> transform(const operation &rhs) const;
 
     operation apply_change(const int &pos, const change &change);
 };
