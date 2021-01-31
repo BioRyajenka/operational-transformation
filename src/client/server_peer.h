@@ -7,28 +7,26 @@
 
 
 #include "../core/operation.h"
+#include "document.h"
 #include "../server/server.h"
 #include "client.h"
+#include "../server/client_peer.h"
+
+//class server;
+//class client;
 
 class server_peer {
 private:
-    int id = -1; // receive id upon connect
-    std::shared_ptr<server> server;
+    std::shared_ptr<server> serv;
 
 public:
-    server_peer(const std::shared_ptr<server> &server) : server(server) {}
+    int client_id = -1; // receive id upon connect
 
-    std::pair<std::unique_ptr<document>, int> connect(const std::shared_ptr<client> &client) {
-        id = server->connect(std::make_shared<client_peer>(client));
-        return server->download_document();
-    }
+    server_peer(const std::shared_ptr<server> &serv) : serv(serv) {}
 
-    void send(const std::shared_ptr<operation> &op, const int &parent_state) {
-        if (parent_state == -1) {
-            throw std::runtime_error("Forgot to load initial state!");
-        }
-        server->on_receive(id, op, parent_state);
-    }
+    std::pair<std::shared_ptr<operation>, int> connect(const std::shared_ptr<client> &client);
+
+    void send(const std::shared_ptr<operation> &op, const int &parent_state);
 };
 
 

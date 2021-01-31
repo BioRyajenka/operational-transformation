@@ -6,9 +6,9 @@
 #define OT_VARIATION_SERVER_H
 
 
+#include <tuple>
 #include <vector>
 #include <memory>
-#include "../core/document.h"
 #include "../core/operation.h"
 #include "client_peer.h"
 #include "history/operations_history.h"
@@ -50,47 +50,15 @@
 
 class server {
 private:
-    std::vector<client_peer> clients;
+    std::vector<std::shared_ptr<client_peer>> clients;
     std::unique_ptr<operations_history> history = std::make_unique<simple_history>();
 
 public:
-    document doc;
+    std::tuple<int, std::shared_ptr<operation>, int> connect(
+            const std::shared_ptr<client_peer> &client, const int &last_known_state
+    );
 
-    int connect(const client_peer &client) {
-        clients.push_back(std::move(client));
-        return (int) clients.size() - 1;
-    }
-
-    std::pair<std::unique_ptr<document>, int> download_document() {
-        return std::make_pair<std::unique_ptr<document>, int>(
-                std::make_shared<document>(doc),
-                history->last_state()
-        );
-    }
-
-    void on_receive(const int &from_client_id, const std::shared_ptr<operation> &op, const int &parent_state) {
-        std::shared_ptr<operation> appl;
-
-        if (history->last_state() == parent_state) {
-            appl = op;
-        } else {
-            const std::shared_ptr<operation> &since = history->fetch(parent_state);
-            const std::pair<std::shared_ptr<operation>, std::shared_ptr<operation>> &p = op->transform(*since);
-            appl = p.second;
-        }
-
-        doc.apply(*appl); // does it copy here?
-        history->push(appl);
-
-        for (auto i = 0; i < clients.size(); i++) {
-            if (i == from_client_id) {
-                // the op itself is sent only for validation
-                clients[i].on_ack(*appl, history->last_state());
-            } else {
-                clients[i].on_receive(*appl, history->last_state());
-            }
-        }
-    }
+    void on_receive(const int &from_client_id, const std::shared_ptr<operation> &op, const int &parent_state);
 };
 
 

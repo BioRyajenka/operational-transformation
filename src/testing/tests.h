@@ -17,35 +17,50 @@
 #include <stdexcept>
 #include "../client/client.h"
 #include "../server/server.h"
+#include "test_document.h"
+
+const int TYPE_DELETE = 0;
+const int TYPE_INSERT = 1;
+const int TYPE_UPDATE = 2;
 
 class client_runner {
     std::thread thread;
 
 public:
     client nested_client;
+    const std::shared_ptr<test_document> doc = std::make_shared<test_document>();
+    const std::shared_ptr<test_document> gauge;
 
-    client_runner(int id, server &server, const std::atomic<bool> &started) : nested_client(server) {
-        thread = std::thread([this, &started]() {
+    client_runner(
+            const std::shared_ptr<server> &serv,
+            const std::shared_ptr<test_document> &gauge,
+            const std::atomic<bool> &started
+    ) : nested_client(doc, serv), gauge(gauge) {
+
+        thread = std::thread([this, &started, &gauge]() {
             const double mean = .2;
             const double variance = .15;
-            std::uniform_real_distribution<double> dice(0, 1);
             std::uniform_real_distribution<double> sleep_rand(mean - variance, mean + variance);
             std::uniform_int_distribution<int> change_type_rand(0, 2);
             std::uniform_int_distribution<int> new_val_rand(INT_MIN, INT_MAX);
             std::default_random_engine rand_engine;
 
-//        nested_client.connect();
-
             while (started) {
                 Sleep(sleep_rand(rand_engine));
 
-                int pos = (int) (dice(rand_engine) * nested_client.doc->size());
-                change change(
-                        static_cast<change_type>(change_type_rand(rand_engine)),
-                        new_val_rand(rand_engine)
+                const auto &node_id = doc->get_random_node_id();
+                const int &type = change_type_rand(rand_engine);
+                const node<symbol> *initial_node = type == TYPE_INSERT || type == TYPE_UPDATE
+                                                   ? nested_client.generate_node(new_val_rand(rand_engine))
+                                                   : nullptr;
+
+                auto op = std::make_shared<operation>(
+                        node_id, type == TYPE_DELETE || type == TYPE_UPDATE, initial_node
                 );
 
-                nested_client.apply_change(pos, change);
+                nested_client.apply_user_op(op);
+                // also apply to gauge
+                gauge->apply(*op);
             }
         });
     }
@@ -57,20 +72,24 @@ public:
 
 // todo: pass delay in argument?
 std::vector<client_runner> start_n_clients(
-        const int &clientsNum, server &server, const std::atomic<bool> &started_flag
+        const int &clientsNum,
+        const std::shared_ptr<server> &server,
+        const std::shared_ptr<test_document> &gauge,
+        const std::atomic<bool> &started_flag
 ) {
     std::vector<client_runner> clients;
     for (int i = 0; i < clientsNum; i++) {
-        clients.emplace_back(i, server, started_flag);
+        clients.emplace_back(server, gauge, started_flag);
     }
     return clients;
 }
 
-void check_consistency(const server &server, const std::vector<client_runner> &clients) {
-    int server_hash = server.doc.hash();
+void check_consistency(
+        const std::shared_ptr<test_document> &gauge, const std::vector<client_runner> &clients
+) {
     int inconsistent_clients = std::accumulate(clients.begin(), clients.end(), 0,
-                                               [&server_hash](const client_runner &client) {
-                                                   return client.nested_client.doc->hash() != server_hash;
+                                               [&gauge](const client_runner &client) {
+                                                   return client.doc->hash() != gauge->hash();
                                                });
     if (inconsistent_clients) {
         throw std::runtime_error(
@@ -83,14 +102,15 @@ void test() {
     int clients_num = 20;
 
     std::atomic<bool> started(true);
-    auto serv = server{};
-    auto clients = start_n_clients(clients_num, serv, started);
+    auto serv = std::make_shared<server>();
+    auto gauge = std::make_shared<test_document>();
+    auto clients = start_n_clients(clients_num, serv, gauge, started);
 
     Sleep(30000);
     started = false;
     std::for_each(clients.begin(), clients.end(), [](client_runner &client) { client.join(); });
 
-    check_consistency(serv, clients);
+    check_consistency(gauge, clients);
 }
 
 // TODO: отдельно потестить кейс из доки

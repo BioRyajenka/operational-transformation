@@ -9,21 +9,17 @@
 #include <memory>
 #include <stdexcept>
 #include "../core/operation.h"
-#include "../core/change.h"
+#include "document.h"
 #include "server_peer.h"
 
 class client {
 public:
-    std::unique_ptr<document> doc;
-
-    client(server &serv) : server(serv) {
-        std::pair<std::unique_ptr<document>, int> p = server.connect(this);
-        doc = p.first;
-        last_known_server_state = p.second;
-    }
+    client(const std::shared_ptr<document> &doc, const std::shared_ptr<server> &serv);
 
 private:
-    server_peer server;
+    std::shared_ptr<document> doc;
+
+    server_peer serv;
     // bridge from the latest known point in the server state
     //  to the latest point in the client state
 //    operation bridge;
@@ -38,65 +34,17 @@ private:
 
     int last_known_server_state = -1;
 
-//    static operation compose(const operation &target);
+    static int free_node_id = 0;
 
 public:
-    void apply_change(const int &pos, const change &change) {
-        doc.apply(pos, change);
-
-        if (in_flight) {
-            if (buffer) {
-                buffer->apply_change(pos, change);
-            } else {
-                buffer = std::make_shared<operation>(pos, change);
-            }
-        } else {
-            in_flight = std::make_shared<operation>(pos, change);
-            server.send(in_flight, last_known_server_state);
-        }
-    }
+    void apply_user_op(const std::shared_ptr<operation> &op);
 
     // op is needed only for validation purposes
-    void on_ack(const operation &op, const int &new_server_state) {
-        if (op.hash() != in_flight->hash()) {
-            throw std::runtime_error("Error validating acknowledged operation.");
-        }
+    void on_ack(const operation &op, const int &new_server_state);
 
-        last_known_server_state = new_server_state;
+    void on_receive(const operation &op, const int &new_server_state);
 
-        if (buffer) {
-            in_flight = buffer;
-            server.send(in_flight, last_known_server_state);
-            buffer = nullptr;
-        }
-    }
-
-    void on_receive(const operation &op, const int &new_server_state) {
-        // надо проверять что предок есть общий?
-
-        last_known_server_state = new_server_state;
-
-        if (in_flight) {
-            const std::pair<operation, operation> &infl_transform = in_flight->transform(op);
-            in_flight = infl_transform.second;
-
-            if (buffer) {
-                const std::pair<operation, operation> &buff_transform = buffer->transform(infl_transform.first);
-                doc.apply(buff_transform.first);
-                buffer = buff_transform.second;
-            } else {
-                doc.apply(infl_transform.first);
-            }
-        } else {
-            if (buffer) {
-                throw std::runtime_error("Invariant is not satisfied! in_flight==null -> buffer==null");
-            }
-            doc.apply(op)
-        }
-    }
-
-//private:
-//    static operation apply_change(const operation &target, const int &pos, const change &change);
+    node<symbol>* generate_node(const int &value);
 };
 
 
