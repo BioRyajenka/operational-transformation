@@ -33,10 +33,6 @@ public:
      */
     void iterate(std::function<void(const node_id_t &)> consumer) const;
 
-    // TODO: когда память освобождать?
-    // TODO: везде где вручную меняю ноды, надо этот хешмап во всех связанных чейнах поддерживать
-    node<symbol> *get_node(unsigned int symbol_id);
-
     node<symbol> *deep_copy() const;
 
     void add_to_beginning(node<symbol> *prefix_chain);

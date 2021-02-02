@@ -8,13 +8,17 @@
 
 #include <memory>
 #include <stdexcept>
+#include <functional>
 #include "../core/operation.h"
 #include "document.h"
 #include "server_peer.h"
 
 class client {
 public:
-    client(const std::shared_ptr<server> &serv);
+    client(
+            const std::shared_ptr<server> &serv,
+            const std::unique_ptr<std::function<void(const operation &)>> &operation_listener
+    );
 
 private:
     server_peer serv;
@@ -32,7 +36,9 @@ private:
 
     int last_known_server_state = -1;
 
-    static int free_node_id = 0;
+    static int free_node_id;
+
+    const std::unique_ptr<std::function<void(const operation &)>> &operation_listener;
 
 public:
     // public for testing
@@ -45,10 +51,7 @@ public:
 
     void on_receive(const operation &op, const int &new_server_state);
 
-    // if the operation was merged only partially
-    void on_recover(const operation &op, const int &new_server_state);
-
-    node<symbol>* generate_node(const int &value);
+    node<symbol> *generate_node(const int &value);
 };
 
 

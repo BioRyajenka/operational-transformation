@@ -8,12 +8,10 @@
 
 #include "../core/operation.h"
 #include "document.h"
-#include "../server/server.h"
-#include "client.h"
 #include "../server/client_peer.h"
 
-//class server;
-//class client;
+class server;
+class client;
 
 class server_peer {
 private:
@@ -24,7 +22,7 @@ public:
 
     server_peer(const std::shared_ptr<server> &serv) : serv(serv) {}
 
-    std::pair<std::shared_ptr<operation>, int> connect(const std::shared_ptr<client> &client);
+    std::pair<std::shared_ptr<operation>, int> connect(client* client);
 
     void send(const std::shared_ptr<operation> &op, const int &parent_state);
 };

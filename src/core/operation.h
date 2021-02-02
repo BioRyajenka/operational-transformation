@@ -45,22 +45,20 @@ public:
 public:
     operation() = default; // empty
 
-    operation(const node_id_t &node_id, const chain& chain_to_copy);
+    // creates new operation with provided chain. note that ch is not copied
+    operation(const node_id_t &node_id, const chain& ch);
 
 //    operation(const int &node_id, const bool &del, node<symbol> *ins) {
 //        lists[node_id] = std::make_pair(del, std::make_shared<chain>(ins));
 //    }
 
-    // only for validation purposes. should be precalculated
-    int hash() const;
-
-    // todo: pointer to operation maybe?
     /**
      * for (this, rhs) returns (rhs', this')
      */
     [[nodiscard]] std::pair<std::shared_ptr<operation>, std::shared_ptr<operation>> transform(
             const operation &rhs,
-            const document &root_state // nullptr for server, smth for client
+            const std::shared_ptr<document> &root_state, // nullptr for server, smth for client
+            const bool &only_right_part
 //            const bool &copy_right_part // if result's right part need to be deep-copied
     ) const;
 
@@ -76,8 +74,19 @@ public:
      */
     void apply(const operation &rhs);
 
-private:
-    bool need_reorder();
+    // only for validation purposes. should be precalculated
+    int hash() const;
+
+    /**
+     * Split current operation 'this' on two operations: 'v' and 'x'. Such that:
+     *  - this = v.x
+     *  - x contains only inserts which start in the nodes listed in 'deletions'
+     *  - v and x not overlaps
+     * Motivation is the following: v is something server can process and x is
+     *  something that can't be processed
+     * @return x or nullptr if x is empty. Modifies this, making it v.
+     */
+    std::shared_ptr<operation> detach_unprocessable_by_server(std::unordered_set<node_id_t> deletions);
 };
 
 

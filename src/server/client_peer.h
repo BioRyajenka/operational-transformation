@@ -10,16 +10,14 @@
 #include "../client/client.h"
 
 class client_peer {
-    std::shared_ptr<client> cl;
+    client* cl;
 
 public:
-    client_peer(const std::shared_ptr<client> &cl) : cl(cl) {}
+    client_peer(client* cl) : cl(cl) {}
 
     void on_ack(const operation& op, const int &new_server_state);
 
     void on_receive(const operation& op, const int &new_server_state);
-
-    void on_recover(const operation &op, const int &new_server_state);
 };
 
 

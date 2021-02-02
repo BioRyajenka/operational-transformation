@@ -3,8 +3,9 @@
 //
 
 #include "server_peer.h"
+#include "../server/server.h"
 
-std::pair<std::shared_ptr<operation>, int> server_peer::connect(const std::shared_ptr<client> &client) {
+std::pair<std::shared_ptr<operation>, int> server_peer::connect(client* client) {
     int last_known_state = 0; // load from scratch
     const auto &resp = serv->connect(std::make_shared<client_peer>(client), last_known_state);
     client_id = std::get<0>(resp);

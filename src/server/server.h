@@ -53,9 +53,6 @@ class server {
 private:
     std::vector<std::shared_ptr<client_peer>> clients;
     std::unique_ptr<operations_history> history = std::make_unique<simple_history>();
-    std::unordered_set<int> document_ids;
-
-    std::shared_ptr<operation> server::apply(const std::shared_ptr<operation> &op, const int &parent_state);
 
 public:
     std::tuple<int, std::shared_ptr<operation>, int> connect(

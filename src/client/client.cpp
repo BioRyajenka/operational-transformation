@@ -5,7 +5,12 @@
 #include <cassert>
 #include "client.h"
 
-client::client(const std::shared_ptr<server> &raw_serv) : serv(raw_serv) {
+int client::free_node_id = 0;
+
+client::client(
+        const std::shared_ptr<server> &raw_serv,
+        const std::unique_ptr<std::function<void(const operation &)>> &operation_listener
+) : serv(raw_serv), operation_listener(operation_listener) {
     const auto &[initial_op, serv_state] = serv.connect(this);
     server_doc->apply(*initial_op);
     server_doc_plus_infl.apply(*initial_op);
@@ -19,7 +24,7 @@ void validate_op_before_send(const operation &op, const document &server_doc) {
     for (const auto&[node_id, _] : op.updates) assert(server_doc.get_node(node_id) != nullptr);
     for (const auto &[node_id, ch] : op.insertions) {
         assert(server_doc.get_node(node_id) != nullptr);
-        ch.iterate([](const auto &ins_id) { assert(server_doc.get_node(ins_id) == nullptr); });
+        ch.iterate([&server_doc](const auto &ins_id) { assert(server_doc.get_node(ins_id) == nullptr); });
     }
 }
 
@@ -60,11 +65,24 @@ void client::on_ack(const operation &op, const int &new_server_state) {
 
 void client::on_receive(const operation &op, const int &new_server_state) {
     if (in_flight) {
-        const auto &infl_transform = in_flight->transform(op, server_doc);
+        // greedy mechanism here: sometimes not whole operation can be processed by server
+        // so, we process it by client
+        const std::shared_ptr<operation> &x = in_flight->detach_unprocessable_by_server(op.deletions);
+        if (x != nullptr) {
+            assert(x->deletions.empty());
+            assert(x->updates.empty());
+            server_doc_plus_infl.undo_insertions(x->insertions);
+            if (buffer != nullptr) {
+                x->apply(buffer);
+            }
+            buffer = x;
+        }
+
+        const auto &infl_transform = in_flight->transform(op, server_doc, false);
         in_flight = infl_transform.second;
 
         if (buffer) {
-            const auto &buff_transform = buffer->transform(*infl_transform.first, server_doc_plus_infl);
+            const auto &buff_transform = buffer->transform(*infl_transform.first, server_doc_plus_infl, true);
 //            doc->apply(*buff_transform.first);
             buffer = buff_transform.second;
         } else {
@@ -79,69 +97,6 @@ void client::on_receive(const operation &op, const int &new_server_state) {
 
     last_known_server_state = new_server_state;
     server_doc.apply(op);
-}
-
-void client::on_recover(const operation &op, const int &new_server_state) {
-    // === validating ops (only for debug) ===
-    for (const auto &)
-
-    // client is now guaranteed to receive the state where conflictings ids are deleted
-    // TODO: do some synchronization queue magic to ensure that
-    // TODO: check here doc which is server copy
-
-    // reduce current inflight by v'
-    // resend new inflight (appended with buffer)
-
-    // итак, к этому моменту клиент базируется на стейте  который после серверного del
-    // inflight сейчас это (v+x)', а buffer тоже соответственно изменен
-    // все изменения применены к doc (включая del'), осталось только перебазироваться из
-    // текущего стейта в v', т.к. сейчас именно такой стейт на сервере
-    // для этого надо разделить (v+x)' на v'+x' и сделать inflight=x'
-    // затем заново отправить новый inflight=inflight+buffer на сервер
-
-    // кажется, что весь v' находится в (v+x)' в виде префиксов
-    for (const auto &[key, value] : op.lists) {
-        assert(in_flight->lists.count(key));
-        // TODO: тут можно гораздо оптимальней, но в целях валидации кода пока так
-        auto v_cur = value->ch.get_root();
-        auto infl_cur = in_flight->lists[key]->ch.get_root();
-        // v   : a
-        // infl: a -> b -> c
-        // res : b -> c
-        in_flight->lists.erase(key);
-
-        // TODO: maybe release memory somewhere here?
-        if (v_cur != nullptr) {
-            infl_cur = infl_cur->next;
-            while (v_cur->next != nullptr) {
-                assert(infl_cur != nullptr);
-                v_cur = v_cur->next;
-                infl_cur = infl_cur->next;
-            }
-        }
-        if (infl_cur != nullptr) {
-            infl_cur->prev = null ? возможно, можно и
-            без этого
-            // TODO: assert current server doc has key
-            in_flight->lists[key] = std::make_shared<change>(change::TYPE_INSERT, 0, infl_cur);
-        }
-    }
-
-    todo:
-    не
-    забыть
-    v
-    ' к локал-сервер-стейту применить
-
-    // TODO: check that in_flight is not empty
-
-    last_known_server_state = new_server_state;
-    if (buffer) {
-        in_flight->apply(*buffer);
-        buffer = nullptr;
-    }
-    validate_op_before_send(in_flight, server_doc);
-    serv.send(in_flight, last_known_server_state);
 }
 
 node<symbol> *client::generate_node(const int &value) {

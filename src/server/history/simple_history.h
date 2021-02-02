@@ -10,14 +10,25 @@
 #include "operations_history.h"
 
 class simple_history : public operations_history {
+    std::vector<std::shared_ptr<operation>> stack;
+
 public:
     void push(const std::shared_ptr<operation> &op) override {
-todo
+        stack.push_back(op);
     };
 
-    std::shared_ptr<operation> fetch(const int &from) const override {
-
+    [[nodiscard]] std::shared_ptr<operation> fetch(const int &from) const override {
+        assert(from >= 0 && from < stack.size());
+        std::shared_ptr<operation> op = std::make_shared<operation>();
+        for (int i = from; i < stack.size(); i++) {
+            op->apply(*stack[i]);
+        }
+        return op;
     };
+
+    [[nodiscard]] int last_state() const override {
+        return (int) stack.size() - 1;
+    }
 };
 
 

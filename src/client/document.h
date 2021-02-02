@@ -7,24 +7,24 @@
 
 #include "../core/node.h"
 #include "../core/symbol.h"
-#include "../testing/magic_list.h"
-#include "../core/chain.h"
 #include "../core/operation.h"
 
-class operation;
-
 class document {
+    operation root;
+
 public:
-    document() = default;
+    document();
 //    todo: корневую нормально обработать. изначально на сервере (и мб клиенте?)
 //     документ создается не пустым, а с корневой вершиной 0. от нее дальше скачим
 
-    virtual void apply(const operation &op) = 0;
+    void apply(const operation &op);
 
     // returns nullptr if there is no such node
     node<symbol>* get_node(const node_id_t &node_id) const;
 
-    int hash() const;
+    void undo_insertions(const std::unordered_map<node_id_t, int> &insertions);
+
+    [[nodiscard]] int hash() const;
 };
 
 #endif //OT_VARIATION_DOCUMENT_H
