@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include "node.h"
 #include "chain.h"
+#include "../client/document.h"
 
 /**
  * list of changes should support following operations:
@@ -37,17 +38,18 @@
 
 class operation {
 public:
-    // symbol_id -> (delete, chain)
-    // delete is true if symbol_id should be deleted
-    // chain is never null, but may be empty
-    std::unordered_map<int, std::pair<bool, std::shared_ptr<chain>>> lists;
+    std::unordered_set<node_id_t> deletions;
+    std::unordered_map<node_id_t, int> updates;
+    std::unordered_map<node_id_t, chain> insertions; // TODO: chain получать по ссылке, складывать через emplace_back
 
 public:
     operation() = default; // empty
 
-    operation(const int &node_id, const bool &del, node<symbol> *ins) {
-        lists[node_id] = std::make_pair(del, std::make_shared<chain>(ins));
-    }
+    operation(const node_id_t &node_id, const chain& chain_to_copy);
+
+//    operation(const int &node_id, const bool &del, node<symbol> *ins) {
+//        lists[node_id] = std::make_pair(del, std::make_shared<chain>(ins));
+//    }
 
     // only for validation purposes. should be precalculated
     int hash() const;
@@ -57,11 +59,25 @@ public:
      * for (this, rhs) returns (rhs', this')
      */
     [[nodiscard]] std::pair<std::shared_ptr<operation>, std::shared_ptr<operation>> transform(
-            const operation &rhs
+            const operation &rhs,
+            const document &root_state // nullptr for server, smth for client
 //            const bool &copy_right_part // if result's right part need to be deep-copied
     ) const;
 
+    /**
+    это когда в начало добавляем
+     node<symbol> *copy = insertion->second.deep_copy();
+    const auto &existing_chain = target->insertions.find(leftmost->value.id);
+    if (existing_chain != target->insertions.end()) {
+        existing_chain->second.add_to_beginning(copy);
+    } else {
+        target->insertions[leftmost->value.id] = copy;
+    }
+     */
     void apply(const operation &rhs);
+
+private:
+    bool need_reorder();
 };
 
 

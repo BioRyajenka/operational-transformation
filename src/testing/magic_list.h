@@ -8,7 +8,7 @@
 template<typename T>
 class magic_list {
 public:
-    void insert(const T&);
+    void insert(const T&); // TODO: throw exception if already exist
     void remove(const T&);
     T get_random() const;
 };

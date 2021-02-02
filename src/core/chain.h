@@ -5,20 +5,41 @@
 #ifndef OT_VARIATION_CHAIN_H
 #define OT_VARIATION_CHAIN_H
 
+#include <cassert>
+#include <functional>
 #include "symbol.h"
 #include "node.h"
 
 class chain {
     node<symbol> *root;
 public:
-    chain(node<symbol> *root) : root(root) {}
-    chain(const chain &rhs); // deep copy
+//    cant be null
+    chain(node<symbol> *root) : root(root) {
+        assert(root->prev == nullptr);
+    }
+//    chain(const chain &rhs); // deep copy
 
-    // may be null
-    node<symbol> *get_root() const;
+    node<symbol> *get_root() const; // TODO: добавить сюда проверку что не пустая цепь и что prev == null
+
+    node<symbol> *get_last() const; // TODO: make it simple, without precalc
+
+    // TODO: is it for debug only?
+    /**
+        auto cur = ch.get_root();
+        while (cur != nullptr) {
+            ;
+            cur = cur->next;
+        }
+     */
+    void iterate(std::function<void(const node_id_t &)> consumer) const;
 
     // TODO: когда память освобождать?
+    // TODO: везде где вручную меняю ноды, надо этот хешмап во всех связанных чейнах поддерживать
     node<symbol> *get_node(unsigned int symbol_id);
+
+    node<symbol> *deep_copy() const;
+
+    void add_to_beginning(node<symbol> *prefix_chain);
 };
 
 #endif //OT_VARIATION_CHAIN_H

@@ -14,11 +14,9 @@
 
 class client {
 public:
-    client(const std::shared_ptr<document> &doc, const std::shared_ptr<server> &serv);
+    client(const std::shared_ptr<server> &serv);
 
 private:
-    std::shared_ptr<document> doc;
-
     server_peer serv;
     // bridge from the latest known point in the server state
     //  to the latest point in the client state
@@ -37,12 +35,18 @@ private:
     static int free_node_id = 0;
 
 public:
+    // public for testing
+    document server_doc;
+    document server_doc_plus_infl;
+
     void apply_user_op(const std::shared_ptr<operation> &op);
 
-    // op is needed only for validation purposes
     void on_ack(const operation &op, const int &new_server_state);
 
     void on_receive(const operation &op, const int &new_server_state);
+
+    // if the operation was merged only partially
+    void on_recover(const operation &op, const int &new_server_state);
 
     node<symbol>* generate_node(const int &value);
 };

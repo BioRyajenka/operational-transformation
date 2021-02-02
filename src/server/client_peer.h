@@ -18,6 +18,8 @@ public:
     void on_ack(const operation& op, const int &new_server_state);
 
     void on_receive(const operation& op, const int &new_server_state);
+
+    void on_recover(const operation &op, const int &new_server_state);
 };
 
 

@@ -1,6 +1,15 @@
+#set(CMAKE_VERBOSE_MAKEFILE ON)
+
 cmake_minimum_required(VERSION 3.16)
 project(ot_variation)
 
+#add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
+#add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+#add_compile_options("$<$<C_COMPILER_ID:MSVC>:/execution-charset:IBM866>")
+#add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/execution-charset:IBM866>")
+
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(ot_variation main.cpp src/client/client.h src/testing/tests.h src/server/server.cpp src/server/server.h src/core/operation.cpp src/core/operation.h src/client/server_peer.h src/server/client_peer.h src/server/history/operations_history.h src/server/history/simple_history.h src/testing/magic_list.h src/core/node.h src/core/symbol.h src/client/document.h src/core/chain.h src/testing/test_document.h src/client/server_peer.cpp src/server/client_peer.cpp src/client/client.cpp)
+add_library(ot_variation_lib STATIC src/client/client.h src/server/server.cpp src/server/server.h src/core/operation.cpp src/core/operation.h src/client/server_peer.h src/server/client_peer.h src/server/history/operations_history.h src/server/history/simple_history.h src/core/node.h src/core/symbol.h src/client/document.h src/core/chain.h src/client/server_peer.cpp src/server/client_peer.cpp src/client/client.cpp)
+
+add_subdirectory(src/testing)

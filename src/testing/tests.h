@@ -5,7 +5,7 @@
 #ifndef OT_VARIATION_TESTS_H
 #define OT_VARIATION_TESTS_H
 
-
+/*
 #include <vector>
 #include <thread>
 #include <atomic>
@@ -19,16 +19,17 @@
 #include "../server/server.h"
 #include "test_document.h"
 
-const int TYPE_DELETE = 0;
-const int TYPE_INSERT = 1;
-const int TYPE_UPDATE = 2;
+static const int TYPE_DELETE = 0;
+static const int TYPE_INSERT = 1;
+static const int TYPE_UPDATE = 2; // update doesn't create new node
 
 class client_runner {
     std::thread thread;
 
 public:
     client nested_client;
-    const std::shared_ptr<test_document> doc = std::make_shared<test_document>();
+//    const std::shared_ptr<test_document> doc = std::make_shared<test_document>();
+// тут можно док не создавать, т.к. в клиенте уже есть
     const std::shared_ptr<test_document> gauge;
 
     client_runner(
@@ -119,4 +120,6 @@ void test() {
 //          (??? это как? звучит сомнительно)
 // TODO: и еще тест на отваливание клиента совсем надолго (оффлайн)
 
+
+ */
 #endif //OT_VARIATION_TESTS_H
