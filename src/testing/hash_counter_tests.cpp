@@ -11,13 +11,13 @@ TEST_CASE("hash_counter") {
     CHECK(a.hash() == 0);
     CHECK(a.hash() == b.hash());
 
-    a.insert_item(2, 2);
+    a.apply_change(1);
+    a.apply_change(7);
+    a.apply_change(13);
 
-    b.insert_item(3, 4);
-    b.insert_item(2, 3);
-    b.update_item(4, 5); // updating 3
-    b.update_item(3, 2); // updating 2
-    b.delete_item(3, 5);
+    b.apply_change(1);
+    b.apply_change(7);
+    b.apply_change(13);
 
     CHECK(a.hash() == b.hash());
 }

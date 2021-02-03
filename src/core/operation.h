@@ -44,6 +44,7 @@ class operation {
     std::unordered_map<node_id_t, int> updates;
     std::unordered_map<node_id_t, chain> insertions;
 
+    // hash will track only order of modifications, applied to operation
     hash_counter hasher;
 
     void rehang_insertions(const node_id_t &node_id, const std::shared_ptr<document> &root_state);

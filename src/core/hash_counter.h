@@ -11,11 +11,7 @@ class hash_counter {
     ll data = 0;
 
 public:
-    void insert_item(const node_id_t &id, const int &val);
-
-    void delete_item(const node_id_t &id, const int &val);
-
-void update_item(const int &prev_val, const int &val);
+    void apply_change(const int &change);
 
     [[nodiscard]] ll hash() const;
 };

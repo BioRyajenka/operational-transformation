@@ -5,6 +5,10 @@
 #include "operation.h"
 #include "../client/document.h"
 
+static const int HASH_FLAG_INSERT = 1351727964;
+static const int HASH_FLAG_UPDATE = -472705117;
+static const int HASH_FLAG_DELETE = 3552447;
+
 void operation::apply(const operation &rhs, const std::shared_ptr<document> &root_state) {
     for (const auto &node_id : rhs.deletions) del(node_id, root_state);
     for (const auto &[node_id, new_value] : rhs.updates) update(node_id, new_value);
@@ -14,7 +18,7 @@ void operation::apply(const operation &rhs, const std::shared_ptr<document> &roo
 void operation::insert(const node_id_t &node_id, const chain &chain_to_copy) {
     assert(!deletions.count(node_id) && "Deleted nodes can't be inserted to");
 
-    chain_to_copy.iterate([this](const auto &s) { hasher.insert_item(s.id, s.value); });
+    hasher.apply_change(HASH_FLAG_INSERT ^ (int)node_id ^ (int)chain_to_copy.get_head()->value.id ^ chain_to_copy.get_tail()->value.value);
 
     const auto &ch = insertions.find(node_id);
     if (ch != insertions.end()) {
@@ -26,11 +30,16 @@ void operation::insert(const node_id_t &node_id, const chain &chain_to_copy) {
 
 void operation::update(const node_id_t &node_id, const int &new_value) {
     assert(!deletions.count(node_id) && "Deleted nodes can't be updated");
+
+    hasher.apply_change(HASH_FLAG_UPDATE ^ (int)node_id ^ new_value);
+
     updates.emplace(node_id, new_value).first->second = new_value;
 }
 
 void operation::del(const node_id_t &node_id, const std::shared_ptr<document> &root_state) {
     assert(!deletions.count(node_id));
+
+    hasher.apply_change(HASH_FLAG_DELETE & (int)node_id);
 
     if (updates.count(node_id)) {
         updates.erase(node_id);

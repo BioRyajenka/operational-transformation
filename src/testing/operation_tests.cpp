@@ -8,12 +8,6 @@
 #include "util/test_util.h"
 #include "../client/document.h"
 
-/**
- * операции
- * добавить хеш в операции и в тесты
- * доки
- */
-
 TEST_CASE("operation") {
     operation base_op;
     base_op.insert(0, chain(create_symbol(1, 0)));
