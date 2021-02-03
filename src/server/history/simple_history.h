@@ -21,7 +21,7 @@ public:
         assert(from >= 0 && from < stack.size());
         std::shared_ptr<operation> op = std::make_shared<operation>();
         for (int i = from; i < stack.size(); i++) {
-            op->apply(*stack[i]);
+            op->apply(*stack[i], nullptr);
         }
         return op;
     };

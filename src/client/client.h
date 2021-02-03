@@ -42,8 +42,8 @@ private:
 
 public:
     // public for testing
-    document server_doc;
-    document server_doc_plus_infl;
+    std::shared_ptr<document> server_doc;
+    std::shared_ptr<document> server_doc_plus_infl;
 
     void apply_user_op(const std::shared_ptr<operation> &op);
 

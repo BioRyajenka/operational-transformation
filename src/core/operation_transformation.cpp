@@ -5,32 +5,30 @@
 #include <unordered_set>
 #include <cassert>
 #include "operation.h"
+#include "../client/document.h"
 
 // TODO: проверить что во всех циклах не важно в каком порядке иду
 
 void merge_chains(
-        const node_id_t& source_node_id,
+        const node_id_t &source_node_id,
         const chain &a, // both are not empty
         const chain &b,
         const std::shared_ptr<operation> &left,
         const std::shared_ptr<operation> &right
 ) {
-    if (a.get_root()->value.id > b.get_root()->value.id) {
+    if (a.get_head()->value.id > b.get_head()->value.id) {
         // a should come first
         merge_chains(source_node_id, b, a, right, left);
         return;
     }
 
     if (left != nullptr) {
-        assert(!left->insertions.count(source_node_id));
-        left->apply(operation(source_node_id, b));
+        assert(!left->get_insertions()->count(source_node_id));
+        left->insert(source_node_id, b);
     }
 
     if (right != nullptr) {
-        // todo: here and everywhere in 'transform' function we can
-        //  slightly optimize performance by replacing 'apply(operation)'
-        //  with direct manual application (i.e. without creating operation obj)
-        right->apply(operation(b.get_last()->value.id, a));
+        right->insert(b.get_tail()->value.id, a);
     }
 }
 
@@ -54,36 +52,36 @@ void apply_corrected_insert_operations(
     // на каждой итерации, если в левой части есть инсерт в вершину, удаленную в правой части,
     // добавляем операцию INSERT prev_node: цепочка инсерта
 
-    assert(state_with_deletion.deletions.count(search_initial_id));
+    assert(state_with_deletion.get_deletions()->count(search_initial_id));
 
     // first, find leftmost
-    node<symbol> *initial_node = root_state->get_node(search_initial_id);
+    node<symbol> const *initial_node = root_state->get_node(search_initial_id);
     assert(initial_node != nullptr);
 
-    node<symbol> *leftmost = initial_node;
-    while (state_with_deletion.deletions.count(leftmost->value.id)) {
+    node<symbol> const *leftmost = initial_node;
+    while (state_with_deletion.get_deletions()->count(leftmost->value.id)) {
         leftmost = leftmost->prev;
-        assert(leftmost != nullptr && "Root node can't be deleted!");
+        assert(leftmost && "Root node can't be deleted!");
     }
 
-    const auto &tmp = state_with_deletion.insertions.find(leftmost->value.id);
-    if (tmp != state_with_deletion.insertions.end()) {
-        leftmost = tmp->second.get_last();
+    const auto &tmp = state_with_deletion.get_insertions()->find(leftmost->value.id);
+    if (tmp != state_with_deletion.get_insertions()->end()) {
+        leftmost = tmp->second.get_tail();
     }
 
     // now, find rightmost deleted
-    node<symbol> *cur = initial_node;
-    while (cur->next != nullptr && state_with_deletion.deletions.count(cur->next->value.id)) {
+    node<symbol> const *cur = initial_node;
+    while (cur->next != nullptr && state_with_deletion.get_deletions()->count(cur->next->value.id)) {
         cur = cur->next;
     }
 
     while (cur != leftmost) {
-        assert(cur != nullptr && state_with_deletion.deletions.count(cur->value.id));
-        const auto& insertion = insertions.find(cur->value.id);
+        assert(cur != nullptr && state_with_deletion.get_deletions()->count(cur->value.id));
+        const auto &insertion = insertions.find(cur->value.id);
         if (insertion != insertions.end()) {
             processed.insert(cur->value.id);
 
-            target->apply(operation(leftmost->value.id, insertion->second));
+            target->insert(leftmost->value.id, insertion->second);
         }
     }
 }
@@ -96,7 +94,7 @@ void process_deleted_insertions(
 ) {
     std::unordered_set<node_id_t> processed;
     for (const auto&[k, ch]: insertions) {
-        if (state_with_deletion.deletions.count(k) && !processed.count(k)) {
+        if (state_with_deletion.get_deletions()->count(k) && !processed.count(k)) {
             assert(root_state != nullptr);
             // arguments:
             //  - starting position of search
@@ -118,8 +116,8 @@ void process_unique_insertions(
         const std::shared_ptr<operation> &target
 ) {
     for (const auto&[node_id, ch]: insertions) {
-        if (!rhs.deletions.count(node_id) && !rhs.insertions.count(node_id)) {
-            target->apply(operation(node_id, ch));
+        if (!rhs.get_deletions()->count(node_id) && !rhs.get_insertions()->count(node_id)) {
+            target->insert(node_id, ch);
         }
     }
 }
@@ -131,9 +129,9 @@ void process_common_insertions(
         const std::shared_ptr<operation> &right
 ) {
     for (const auto&[node_id, ch]: insertions) {
-        const auto &rhs_insertion = rhs.insertions.find(node_id);
-        if (rhs_insertion != rhs.insertions.end()) {
-            assert(!rhs.deletions.count(node_id)); // TODO: too obvious assert. can be deleted
+        const auto &rhs_insertion = rhs.get_insertions()->find(node_id);
+        if (rhs_insertion != rhs.get_insertions()->end()) {
+            assert(!rhs.get_deletions()->count(node_id)); // TODO: too obvious assert. can be deleted
 
             merge_chains(node_id, ch, rhs_insertion->second, left, right);
         }
@@ -147,7 +145,8 @@ void process_deletions(
 ) {
     for (const auto &node_id : deletions) {
         if (!rhs_deletions.count(node_id)) {
-            target->deletions.insert(node_id);
+            // root_state is not needed here
+            target->del(node_id, nullptr);
         }
     }
 }
@@ -158,11 +157,11 @@ void process_updates(
         const std::shared_ptr<operation> &target
 ) {
     for (const auto &[node_id, new_value] : updates) {
-        if (!rhs.deletions.count(node_id)) {
-            const auto &rhs_update = rhs.updates.find(node_id);
-            if (rhs_update == rhs.updates.end() || new_value < rhs_update->second) {
+        if (!rhs.get_deletions()->count(node_id)) {
+            const auto &rhs_update = rhs.get_updates()->find(node_id);
+            if (rhs_update == rhs.get_updates()->end() || new_value < rhs_update->second) {
                 // if there is no update in rhs or our new_value is less than in rhs
-                target->updates[node_id] = new_value;
+                target->update(node_id, new_value);
             }
         }
     }
@@ -176,7 +175,7 @@ void process_updates(
  */
 
 // TODO: единственные места, где я могу поменять операции - это insertions
-//  (сейчас в этом файле это все места с apply(operation(...))
+//  (сейчас в этом файле это все места с .insert(...))
 //  сейчас конструктор новой операции не копирует цепь, но сама apply копирует
 //  вдруг я могу не копирововать даже в apply? могу, если та цепь, что в
 //  конструкторе, никогда не меняется и не используется (не читается)

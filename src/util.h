@@ -7,5 +7,6 @@
 
 //#define id unsigned long long
 typedef unsigned int node_id_t;
+typedef long long ll;
 
 #endif //OT_VARIATION_UTIL_H

@@ -4,6 +4,8 @@
 
 #include <cassert>
 #include "client.h"
+#include "server_peer.h"
+#include "../server/server.h"
 
 int client::free_node_id = 0;
 
@@ -12,17 +14,21 @@ client::client(
         const std::unique_ptr<std::function<void(const operation &)>> &operation_listener
 ) : serv(raw_serv), operation_listener(operation_listener) {
     const auto &[initial_op, serv_state] = serv.connect(this);
+
+    server_doc = std::make_shared<document>();
     server_doc->apply(*initial_op);
-    server_doc_plus_infl.apply(*initial_op);
+    server_doc_plus_infl = std::make_shared<document>();
+    server_doc_plus_infl->apply(*initial_op);
+
     last_known_server_state = serv_state;
 }
 
 void validate_op_before_send(const operation &op, const document &server_doc) {
     // checking that every change starts at known server doc's state and
     // contains only new nodes in insertions
-    for (const auto &node_id : op.deletions) assert(server_doc.get_node(node_id) != nullptr);
-    for (const auto&[node_id, _] : op.updates) assert(server_doc.get_node(node_id) != nullptr);
-    for (const auto &[node_id, ch] : op.insertions) {
+    for (const auto &node_id : *op.get_deletions()) assert(server_doc.get_node(node_id) != nullptr);
+    for (const auto&[node_id, _] : *op.get_updates()) assert(server_doc.get_node(node_id) != nullptr);
+    for (const auto &[node_id, ch] : *op.get_insertions()) {
         assert(server_doc.get_node(node_id) != nullptr);
         ch.iterate([&server_doc](const auto &ins_id) { assert(server_doc.get_node(ins_id) == nullptr); });
     }
@@ -33,16 +39,16 @@ void client::apply_user_op(const std::shared_ptr<operation> &op) {
 
     if (in_flight) {
         if (buffer) {
-            buffer->apply(*op);
+            buffer->apply(*op, server_doc_plus_infl);
         } else {
             buffer = op;
         }
     } else {
         assert(!buffer && "Invariant is not satisfied! in_flight==null -> buffer==null");
         in_flight = op;
-        validate_op_before_send(in_flight, server_doc);
+        validate_op_before_send(*in_flight, *server_doc);
         serv.send(in_flight, last_known_server_state);
-        server_doc_plus_infl.apply(in_flight);
+        server_doc_plus_infl->apply(*in_flight);
     }
 }
 
@@ -50,15 +56,15 @@ void client::on_ack(const operation &op, const int &new_server_state) {
     assert(op.hash() == in_flight->hash() && "Acknowledged operation should be the same as predicted");
 
     last_known_server_state = new_server_state;
-    server_doc.apply(op);
+    server_doc->apply(op);
 
-    assert(server_doc.hash() == server_doc_plus_infl.hash());
+    assert(server_doc->hash() == server_doc_plus_infl->hash());
 
     if (buffer) {
         in_flight = buffer;
-        validate_op_before_send(in_flight, server_doc);
+        validate_op_before_send(*in_flight, *server_doc);
         serv.send(in_flight, last_known_server_state);
-        server_doc_plus_infl.apply(in_flight);
+        server_doc_plus_infl->apply(*in_flight);
         buffer = nullptr;
     }
 }
@@ -67,13 +73,13 @@ void client::on_receive(const operation &op, const int &new_server_state) {
     if (in_flight) {
         // greedy mechanism here: sometimes not whole operation can be processed by server
         // so, we process it by client
-        const std::shared_ptr<operation> &x = in_flight->detach_unprocessable_by_server(op.deletions);
+        const std::shared_ptr<operation> &x = in_flight->detach_unprocessable_by_server(*op.get_deletions());
         if (x != nullptr) {
-            assert(x->deletions.empty());
-            assert(x->updates.empty());
-            server_doc_plus_infl.undo_insertions(x->insertions);
+            assert(x->get_deletions()->empty());
+            assert(x->get_updates()->empty());
+            server_doc_plus_infl->undo_insertions(*x->get_insertions());
             if (buffer != nullptr) {
-                x->apply(buffer);
+                x->apply(*buffer, server_doc_plus_infl);
             }
             buffer = x;
         }
@@ -88,15 +94,15 @@ void client::on_receive(const operation &op, const int &new_server_state) {
         } else {
 //            doc->apply(*infl_transform.first);
         }
-        server_doc_plus_infl.apply(*infl_transform.first);
+        server_doc_plus_infl->apply(*infl_transform.first);
     } else {
         assert(!buffer && "Invariant is not satisfied! in_flight==null -> buffer==null");
 //        doc->apply(op);
-        server_doc_plus_infl.apply(op);
+        server_doc_plus_infl->apply(op);
     }
 
     last_known_server_state = new_server_state;
-    server_doc.apply(op);
+    server_doc->apply(op);
 }
 
 node<symbol> *client::generate_node(const int &value) {

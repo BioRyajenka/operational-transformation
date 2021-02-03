@@ -20,7 +20,7 @@ private:
 public:
     int client_id = -1; // receive id upon connect
 
-    server_peer(const std::shared_ptr<server> &serv) : serv(serv) {}
+    server_peer(const std::shared_ptr<server> &serv);
 
     std::pair<std::shared_ptr<operation>, int> connect(client* client);
 

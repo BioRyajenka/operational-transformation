@@ -10,21 +10,24 @@
 #include "../core/operation.h"
 
 class document {
-    operation root;
+    chain data;
+    hash_counter hasher;
+    std::unordered_map<node_id_t, node<symbol>*> map;
 
 public:
-    document();
-//    todo: корневую нормально обработать. изначально на сервере (и мб клиенте?)
-//     документ создается не пустым, а с корневой вершиной 0. от нее дальше скачим
+    document() : data(symbol::initial) {
+        map[symbol::initial.id] = new node<symbol>(nullptr, nullptr, symbol::initial);
+    }
 
     void apply(const operation &op);
 
     // returns nullptr if there is no such node
-    node<symbol>* get_node(const node_id_t &node_id) const;
+    [[nodiscard]] node<symbol> const *get_node(const node_id_t &node_id) const;
 
-    void undo_insertions(const std::unordered_map<node_id_t, int> &insertions);
+    // assuming they were in last applied operation
+    void undo_insertions(const std::unordered_map<node_id_t, chain> &insertions);
 
-    [[nodiscard]] int hash() const;
+    [[nodiscard]] ll hash() const;
 };
 
 #endif //OT_VARIATION_DOCUMENT_H

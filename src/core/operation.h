@@ -8,10 +8,11 @@
 
 #include <utility>
 #include <memory>
+#include <unordered_set>
 #include <unordered_map>
 #include "node.h"
 #include "chain.h"
-#include "../client/document.h"
+#include "hash_counter.h"
 
 /**
  * list of changes should support following operations:
@@ -36,21 +37,27 @@
  *
  */
 
+class document;
+
 class operation {
-public:
+    static const int HASH_FLAG_INS = 1351727964;
+    static const int HASH_FLAG_UPD = -472705117;
+    static const int HASH_FLAG_DEL = 3552447;
+
     std::unordered_set<node_id_t> deletions;
     std::unordered_map<node_id_t, int> updates;
-    std::unordered_map<node_id_t, chain> insertions; // TODO: chain получать по ссылке, складывать через emplace_back
+    std::unordered_map<node_id_t, chain> insertions;
+
+    hash_counter hasher;
+
+    void rehang_insertions(const node_id_t &node_id, const std::shared_ptr<document> &root_state);
 
 public:
+    std::unordered_set<node_id_t> const *get_deletions() const { return &deletions; };
+    std::unordered_map<node_id_t, int> const *get_updates() const { return &updates; };
+    std::unordered_map<node_id_t, chain> const *get_insertions() const { return &insertions; };
+
     operation() = default; // empty
-
-    // creates new operation with provided chain. note that ch is not copied
-    operation(const node_id_t &node_id, const chain& ch);
-
-//    operation(const int &node_id, const bool &del, node<symbol> *ins) {
-//        lists[node_id] = std::make_pair(del, std::make_shared<chain>(ins));
-//    }
 
     /**
      * for (this, rhs) returns (rhs', this')
@@ -72,10 +79,20 @@ public:
         target->insertions[leftmost->value.id] = copy;
     }
      */
-    void apply(const operation &rhs);
+    // root_state is optional and is needed only for cases where
+    // user wants to delete node, which has insertions on it
+    // in this case insertions are being rehanged
+    void apply(const operation &rhs, const std::shared_ptr<document> &root_state);
+
+    void insert(const node_id_t &node_id, const chain &chain_to_copy);
+
+    void update(const node_id_t &node_id, const int& new_value);
+
+    // fast versions, slightly faster than 'apply', as it don't require intermediate objects
+    void del(const node_id_t &node_id, const std::shared_ptr<document> &root_state);
 
     // only for validation purposes. should be precalculated
-    int hash() const;
+    ll hash() const;
 
     /**
      * Split current operation 'this' on two operations: 'v' and 'x'. Such that:
@@ -86,7 +103,7 @@ public:
      *  something that can't be processed
      * @return x or nullptr if x is empty. Modifies this, making it v.
      */
-    std::shared_ptr<operation> detach_unprocessable_by_server(std::unordered_set<node_id_t> deletions);
+    std::shared_ptr<operation> detach_unprocessable_by_server(const std::unordered_set<node_id_t> &dels);
 };
 
 

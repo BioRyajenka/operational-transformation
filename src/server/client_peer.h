@@ -7,13 +7,14 @@
 
 
 #include "../core/operation.h"
-#include "../client/client.h"
+
+class client;
 
 class client_peer {
     client* cl;
 
 public:
-    client_peer(client* cl) : cl(cl) {}
+    explicit client_peer(client* cl);
 
     void on_ack(const operation& op, const int &new_server_state);
 
