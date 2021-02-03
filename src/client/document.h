@@ -16,10 +16,10 @@ class document {
 
 public:
     document() : data(symbol::initial) {
-        map[symbol::initial.id] = new node<symbol>(nullptr, nullptr, symbol::initial);
+        map[symbol::initial.id] = data.get_head();
     }
 
-    void apply(const operation &op);
+    void apply(const operation &s);
 
     // returns nullptr if there is no such node
     [[nodiscard]] node<symbol> const *get_node(const node_id_t &node_id) const;

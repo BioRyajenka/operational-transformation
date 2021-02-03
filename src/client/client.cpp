@@ -26,11 +26,11 @@ client::client(
 void validate_op_before_send(const operation &op, const document &server_doc) {
     // checking that every change starts at known server doc's state and
     // contains only new nodes in insertions
-    for (const auto &node_id : *op.get_deletions()) assert(server_doc.get_node(node_id) != nullptr);
-    for (const auto&[node_id, _] : *op.get_updates()) assert(server_doc.get_node(node_id) != nullptr);
+    for (const auto &node_id : *op.get_deletions()) assert(server_doc.get_node(node_id));
+    for (const auto&[node_id, _] : *op.get_updates()) assert(server_doc.get_node(node_id));
     for (const auto &[node_id, ch] : *op.get_insertions()) {
-        assert(server_doc.get_node(node_id) != nullptr);
-        ch.iterate([&server_doc](const auto &ins_id) { assert(server_doc.get_node(ins_id) == nullptr); });
+        assert(server_doc.get_node(node_id));
+        ch.iterate([&server_doc](const auto &s) { assert(server_doc.get_node(s.id) == nullptr); });
     }
 }
 

@@ -8,8 +8,14 @@
 #include "../util.h"
 
 class hash_counter {
+    ll data = 0;
+
 public:
-    void add_item(const int &item);
+    void insert_item(const node_id_t &id, const int &val);
+
+    void delete_item(const node_id_t &id, const int &val);
+
+void update_item(const int &prev_val, const int &val);
 
     [[nodiscard]] ll hash() const;
 };

@@ -192,9 +192,9 @@ std::pair<std::shared_ptr<operation>, std::shared_ptr<operation>> operation::tra
     // validate all new nodes are unique
     std::unordered_set<node_id_t> temp;
     for (const auto&[k, ch]: insertions) {
-        ch.iterate([&temp](const node_id_t &val) {
-            assert(!temp.count(val));
-            temp.insert(val);
+        ch.iterate([&temp](const auto &s) {
+            assert(!temp.count(s.id));
+            temp.insert(s.id);
         });
     }
     for (const auto&[k, ch]: rhs.insertions) {

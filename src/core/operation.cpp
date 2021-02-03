@@ -14,11 +14,13 @@ void operation::apply(const operation &rhs, const std::shared_ptr<document> &roo
 void operation::insert(const node_id_t &node_id, const chain &chain_to_copy) {
     assert(!deletions.count(node_id) && "Deleted nodes can't be inserted to");
 
-    const auto& ch = insertions.find(node_id);
+    chain_to_copy.iterate([this](const auto &s) { hasher.insert_item(s.id, s.value); });
+
+    const auto &ch = insertions.find(node_id);
     if (ch != insertions.end()) {
         ch->second.copy_to_the_beginning(chain_to_copy);
     } else {
-        insertions.emplace(node_id, chain_to_copy);
+        insertions.emplace(node_id, chain_to_copy); // copying here, not moving
     }
 }
 
@@ -28,7 +30,7 @@ void operation::update(const node_id_t &node_id, const int &new_value) {
 }
 
 void operation::del(const node_id_t &node_id, const std::shared_ptr<document> &root_state) {
-    // TODO: update hash here
+    assert(!deletions.count(node_id));
 
     if (updates.count(node_id)) {
         updates.erase(node_id);
@@ -89,7 +91,7 @@ ll operation::hash() const {
 
 std::shared_ptr<operation> operation::detach_unprocessable_by_server(const std::unordered_set<node_id_t> &dels) {
     std::shared_ptr<operation> x = nullptr;
-    for (auto it = insertions.begin(); it != insertions.end(); ) {
+    for (auto it = insertions.begin(); it != insertions.end();) {
         if (deletions.count(it->first)) {
             if (x == nullptr) x = std::make_shared<operation>();
             x->insertions.emplace(it->first, std::move(it->second));
