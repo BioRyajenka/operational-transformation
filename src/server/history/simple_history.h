@@ -23,18 +23,18 @@ public:
         assert(from >= 0 && from < stack.size());
         std::shared_ptr<operation> op = std::make_shared<operation>();
 
-        if (from == 2) printf("stack: \n");
+//        if (from == 2) printf("stack: \n");
         for (int i = from; i < stack.size(); i++) {
-            if (from == 2) {
-                print_operation("[" + std::to_string(i) + "]", *stack[i]);
-            }
-            op->apply(*stack[i], nullptr);
+//            if (from == 2) {
+//                print_operation("[" + std::to_string(i) + "]", *stack[i]);
+//            }
+            op->apply(*stack[i]);
         }
         return op;
     };
 
     [[nodiscard]] int last_state() const override {
-        return (int) stack.size() - 1;
+        return (int) stack.size();
     }
 };
 

@@ -24,10 +24,7 @@ TEST_CASE("client-server simple scenarios") {
 
     SUBCASE("clients download initial data correctly") {
         CHECK(check_doc_ids(*cl1->server_doc, {0, 1, 2, 3}));
-        CHECK(check_doc_ids(*cl1->server_doc_plus_infl, {0, 1, 2, 3}));
-
         CHECK(check_doc_ids(*cl2->server_doc, {0, 1, 2, 3}));
-        CHECK(check_doc_ids(*cl2->server_doc_plus_infl, {0, 1, 2, 3}));
     }
 
     SUBCASE("client sees other client's changes") {
@@ -35,17 +32,14 @@ TEST_CASE("client-server simple scenarios") {
         op->insert(2, create_chain({4, 5}));
         cl1->apply_user_op(op);
         CHECK(check_doc_ids(*cl1->server_doc, {0, 1, 2, 3}));
-        CHECK(check_doc_ids(*cl1->server_doc_plus_infl, {0, 1, 2, 4, 5, 3}));
 
         serv_peer->proceed_one_task(); // sends ack to client1 and update to client2
 
         serv->get_peer(cl1->id())->proceed_one_task(); // ack
         CHECK(check_doc_ids(*cl1->server_doc, {0, 1, 2, 4, 5, 3}));
-        CHECK(check_doc_ids(*cl1->server_doc_plus_infl, {0, 1, 2, 4, 5, 3}));
 
         serv->get_peer(cl2->id())->proceed_one_task(); // update
         CHECK(check_doc_ids(*cl2->server_doc, {0, 1, 2, 4, 5, 3}));
-        CHECK(check_doc_ids(*cl2->server_doc_plus_infl, {0, 1, 2, 4, 5, 3}));
     }
 
     SUBCASE("client 2 sends delete while there is unreceived insert from server") {
@@ -57,7 +51,7 @@ TEST_CASE("client-server simple scenarios") {
         // and 1 on cl2
 
         auto second = std::make_shared<operation>();
-        second->del(2, nullptr);
+        second->del(2, 1);
         cl2->apply_user_op(second);
         serv_peer->proceed_one_task();
         // now 2 tasks pending on cl1 and cl2
@@ -67,14 +61,12 @@ TEST_CASE("client-server simple scenarios") {
         serv->get_peer(cl2->id())->proceed_one_task();
         serv->get_peer(cl2->id())->proceed_one_task();
         CHECK(check_doc_ids(*cl1->server_doc, {0, 1, 4, 5, 3}));
-        CHECK(check_doc_ids(*cl1->server_doc_plus_infl, {0, 1, 4, 5, 3}));
         CHECK(check_doc_ids(*cl2->server_doc, {0, 1, 4, 5, 3}));
-        CHECK(check_doc_ids(*cl2->server_doc_plus_infl, {0, 1, 4, 5, 3}));
     }
 
     SUBCASE("client 2 sends insert while there is unreceived delete from server") {
         auto first = std::make_shared<operation>();
-        first->del(2, nullptr);
+        first->del(2, 1);
         cl1->apply_user_op(first);
         serv_peer->proceed_one_task();
         // now 1 task pending on cl1
@@ -91,21 +83,14 @@ TEST_CASE("client-server simple scenarios") {
         serv->get_peer(cl2->id())->proceed_one_task();
         serv->get_peer(cl2->id())->proceed_one_task();
 
-        // surplus (x)
-        serv_peer->proceed_one_task();
-        serv->get_peer(cl1->id())->proceed_one_task();
-        serv->get_peer(cl2->id())->proceed_one_task();
-
         CHECK(check_doc_ids(*cl1->server_doc, {0, 1, 6, 3}));
-        CHECK(check_doc_ids(*cl1->server_doc_plus_infl, {0, 1, 6, 3}));
         CHECK(check_doc_ids(*cl2->server_doc, {0, 1, 6, 3}));
-        CHECK(check_doc_ids(*cl2->server_doc_plus_infl, {0, 1, 6, 3}));
     }
 
     SUBCASE("cross deleted insertions 1") {
         auto first = std::make_shared<operation>();
         first->insert(1, create_chain({6}));
-        first->del(2, nullptr);
+        first->del(2, 1);
         cl1->apply_user_op(first);
         serv_peer->proceed_one_task();
         // now 1 task pending on cl1
@@ -113,31 +98,25 @@ TEST_CASE("client-server simple scenarios") {
 
         auto second = std::make_shared<operation>();
         second->insert(2, create_chain({4, 5}));
-        second->del(1, nullptr);
+        second->del(1, 0);
         cl2->apply_user_op(second);
         serv_peer->proceed_one_task();
         // now 2 tasks pending on cl1 and cl2
 
         serv->get_peer(cl1->id())->proceed_one_task();
         serv->get_peer(cl1->id())->proceed_one_task();
+//        print_doc("cl1", *cl1->server_doc);
         serv->get_peer(cl2->id())->proceed_one_task();
-        serv->get_peer(cl2->id())->proceed_one_task();
-
-        // surplus (x)
-        serv_peer->proceed_one_task();
-        serv->get_peer(cl1->id())->proceed_one_task();
         serv->get_peer(cl2->id())->proceed_one_task();
 
         CHECK(check_doc_ids(*cl1->server_doc, {0, 6, 4, 5, 3}));
-        CHECK(check_doc_ids(*cl1->server_doc_plus_infl, {0, 6, 4, 5, 3}));
         CHECK(check_doc_ids(*cl2->server_doc, {0, 6, 4, 5, 3}));
-        CHECK(check_doc_ids(*cl2->server_doc_plus_infl, {0, 6, 4, 5, 3}));
     }
 
     SUBCASE("cross deleted insertions 2 (swapped)") {
         auto first = std::make_shared<operation>();
         first->insert(2, create_chain({4, 5}));
-        first->del(1, nullptr);
+        first->del(1, 0);
         cl1->apply_user_op(first);
         serv_peer->proceed_one_task();
         // now 1 task pending on cl1
@@ -145,7 +124,7 @@ TEST_CASE("client-server simple scenarios") {
 
         auto second = std::make_shared<operation>();
         second->insert(1, create_chain({6}));
-        second->del(2, nullptr);
+        second->del(2, 1);
         cl2->apply_user_op(second);
         serv_peer->proceed_one_task();
         // now 2 tasks pending on cl1 and cl2
@@ -155,19 +134,12 @@ TEST_CASE("client-server simple scenarios") {
         serv->get_peer(cl2->id())->proceed_one_task();
         serv->get_peer(cl2->id())->proceed_one_task();
 
-        // surplus (x)
-        serv_peer->proceed_one_task();
-        serv->get_peer(cl1->id())->proceed_one_task();
-        serv->get_peer(cl2->id())->proceed_one_task();
-
 //        printf("queue serv: %d\n", serv_peer->get_pending_queue_size());
 //        printf("queue1: %d\n", serv->get_peer(cl1->id())->get_pending_queue_size());
 //        printf("queue2: %d\n", serv->get_peer(cl2->id())->get_pending_queue_size());
 
-        CHECK(check_doc_ids(*cl1->server_doc, {0, 4, 5, 6, 3}));
-        CHECK(check_doc_ids(*cl1->server_doc_plus_infl, {0, 4, 5, 6, 3}));
-        CHECK(check_doc_ids(*cl2->server_doc, {0, 4, 5, 6, 3}));
-        CHECK(check_doc_ids(*cl2->server_doc_plus_infl, {0, 4, 5, 6, 3}));
+        CHECK(check_doc_ids(*cl1->server_doc, {0, 6, 4, 5, 3}));
+        CHECK(check_doc_ids(*cl2->server_doc, {0, 6, 4, 5, 3}));
     }
 
     // TODO: еще можно стресстест на operational_transform:

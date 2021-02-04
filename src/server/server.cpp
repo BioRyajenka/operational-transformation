@@ -33,8 +33,7 @@ void server::on_receive(const int &from_client_id, const std::shared_ptr<operati
         appl = op;
     } else {
         const std::shared_ptr<operation> &since = history->fetch(parent_state);
-        op->detach_unprocessable_by_server(*since->get_deletions());
-        appl = op->transform(*since, nullptr, true).second;
+        appl = op->transform(*since, true).second;
     }
 
     if (!appl->get_deletions()->empty() || !appl->get_insertions()->empty() || !appl->get_updates()->empty()) {

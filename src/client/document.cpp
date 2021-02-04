@@ -7,7 +7,11 @@
 
 void document::apply(const operation &op) {
     // === validation (only for debug) ===
-    for (const auto &node_id : *op.get_deletions()) assert(node_id != symbol::initial.id && map.count(node_id));
+    for (const auto &[node_id, parent_id] : *op.get_deletions()) {
+        assert(node_id != symbol::initial.id);
+        assert(map.count(node_id));
+        assert(map.count(parent_id));
+    }
 //    for (const auto&[node_id, _] : *op.get_updates()) assert(map.count(node_id));
     for (const auto &[node_id, ch] : *op.get_insertions()) {
         assert(map.count(node_id));
@@ -15,7 +19,7 @@ void document::apply(const operation &op) {
     }
     // === end validation ===
 
-    for (const auto &node_id : *op.get_deletions()) {
+    for (const auto &[node_id, _] : *op.get_deletions()) {
         const node<symbol> *n = map.at(node_id);
 
         content_hash ^= n->value.id * n->value.value;

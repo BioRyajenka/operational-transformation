@@ -86,7 +86,7 @@ void print_operation(const std::string &prefix, const operation &op) {
     printf("%s: \n", prefix.c_str());
 
     printf(" deletions: ");
-    for (const auto &node_id: *op.get_deletions()) printf("%d ", node_id);
+    for (const auto &[node_id, parent_id]: *op.get_deletions()) printf("%d(%d) ", node_id, parent_id);
 
     printf("\n insertions: ");
     for (const auto &[node_id, ch]: *op.get_insertions()) {

@@ -20,9 +20,9 @@ TEST_CASE("document") {
         CHECK(check_doc_ids(*doc, {0, 1, 2, 4, 5, 3}));
 
         operation op2;
-        op2.del(2, nullptr);
-        op2.del(3, nullptr);
-        op2.del(5, nullptr);
+        op2.del(2, 1);
+        op2.del(3, 5);
+        op2.del(5, 4);
         doc->apply(op2);
         CHECK(check_doc_ids(*doc, {0, 1, 4}));
     }

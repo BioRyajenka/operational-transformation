@@ -49,7 +49,7 @@ void run_in_one_thread(
                     ml->insert(s.id);
                 });
             }
-            for (const auto &node_id : *op.get_deletions()) {
+            for (const auto &[node_id, _] : *op.get_deletions()) {
                 ml->remove(node_id);
             }
 
@@ -90,22 +90,20 @@ void run_in_one_thread(
             // producing action on one of the clients
 
             auto &[cl, ml] = clients[dice(rand_engine) * clients.size()];
-            auto op = std::make_shared<operation>();
             node_id_t random_node_id = ml->get_random();
             int op_type = random_node_id == symbol::initial.id ? TYPE_INSERT : operation_type_generator(rand_engine);
 
             if (op_type == TYPE_UPDATE) {
-                op->update(random_node_id, value_generator(rand_engine));
+                cl->do_update(random_node_id, value_generator(rand_engine));
             } else if (op_type == TYPE_DELETE) {
-                op->del(random_node_id, nullptr);
+                cl->do_delete(random_node_id);
             } else if (op_type == TYPE_INSERT) {
-                op->insert(random_node_id, chain(cl->generate_symbol(value_generator(rand_engine))));
+                cl->do_insert(random_node_id, value_generator(rand_engine));
             }
 
 //            printf("client %d arises operation", cl->id());
 //            print_operation("", *op);
 
-            cl->apply_user_op(op);
             operations_produced++;
         } else {
             // consuming on one of the clients or on the server
@@ -153,10 +151,8 @@ void run_in_one_thread(
 
     // === validating docs ===
     ll gauge = clients[0].first->server_doc->hash();
-    assert(clients[0].first->server_doc_plus_infl->hash() == gauge);
     for (int i = 1; i < (int) clients.size(); i++) {
         assert(clients[i].first->server_doc->hash() == gauge);
-        assert(clients[i].first->server_doc_plus_infl->hash() == gauge);
     }
 
     // === ===

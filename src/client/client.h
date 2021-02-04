@@ -38,18 +38,22 @@ private:
 
     void send_to_server(const operation &op, const int &parent_state);
 
+    symbol generate_symbol(const int &value) const;
+
 public:
+
     // public for testing
     std::shared_ptr<document> server_doc;
-    std::shared_ptr<document> server_doc_plus_infl;
 
     void apply_user_op(const std::shared_ptr<operation> &op);
+
+    void do_insert(const node_id_t &node_id, const int value);
+    void do_update(const node_id_t &node_id, const int new_value);
+    void do_delete(const node_id_t &node_id);
 
     void on_ack(const operation &op, const int &new_server_state);
 
     void on_receive(const operation &op, const int &new_server_state);
-
-    symbol generate_symbol(const int &value) const;
 
     int id() const;
 };

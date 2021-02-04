@@ -40,7 +40,8 @@
 class document;
 
 class operation {
-    std::unordered_set<node_id_t> deletions;
+    // value is a parent
+    std::unordered_map<node_id_t, node_id_t> deletions;
     std::unordered_map<node_id_t, int> updates;
     std::unordered_map<node_id_t, chain> insertions;
 
@@ -48,12 +49,12 @@ class operation {
 //    hash_counter hasher;
     ll content_hash = 0;
 
-    void rehang_insertions(const node_id_t &node_id, const std::shared_ptr<document> &root_state);
+    void rehang_insertions(const node_id_t &from_node_id, const node_id_t &to_node_id);
 
 public:
     operation(const operation& op_to_copy);
 
-    [[nodiscard]] std::unordered_set<node_id_t> const *get_deletions() const { return &deletions; };
+    [[nodiscard]] std::unordered_map<node_id_t, node_id_t> const *get_deletions() const { return &deletions; };
     [[nodiscard]] std::unordered_map<node_id_t, int> const *get_updates() const { return &updates; };
     [[nodiscard]] std::unordered_map<node_id_t, chain> const *get_insertions() const { return &insertions; };
 
@@ -64,7 +65,6 @@ public:
      */
     [[nodiscard]] std::pair<std::shared_ptr<operation>, std::shared_ptr<operation>> transform(
             const operation &s,
-            const std::shared_ptr<document> &root_state, // nullptr for server, smth for client
             const bool &only_right_part
 //            const bool &copy_right_part // if result's right part need to be deep-copied
     ) const;
@@ -72,28 +72,17 @@ public:
     // root_state is optional and is needed only for cases where
     // user wants to delete node, which has insertions on it
     // in this case insertions are being rehanged
-    void apply(const operation &rhs, const std::shared_ptr<document> &root_state);
+    void apply(const operation &rhs);
 
     void insert(const node_id_t &s, const chain &chain_to_copy);
 
     void update(const node_id_t &node_id, const int& new_value);
 
     // fast versions, slightly faster than 'apply', as it don't require intermediate objects
-    void del(const node_id_t &node_id, const std::shared_ptr<document> &root_state);
+    void del(const node_id_t &node_id, const node_id_t &parent_id);
 
     // only for validation purposes. should be precalculated
     ll hash() const;
-
-    /**
-     * Split current operation 'this' on two operations: 'v' and 'x'. Such that:
-     *  - this = v.x
-     *  - x contains only inserts which start in the nodes listed in 'deletions'
-     *  - v and x not overlaps
-     * Motivation is the following: v is something server can process and x is
-     *  something that can't be processed
-     * @return x or nullptr if x is empty. Modifies this, making it v.
-     */
-    std::shared_ptr<operation> detach_unprocessable_by_server(const std::unordered_set<node_id_t> &dels);
 };
 
 
