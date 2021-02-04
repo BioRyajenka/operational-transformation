@@ -7,18 +7,31 @@
 
 
 #include "../core/operation.h"
+#include "../core/blocking_queue.h"
 
 class client;
 
 class client_peer {
-    client* cl;
+private:
+    enum task_type { ACK, RECEIVE };
+    typedef std::tuple<task_type, std::shared_ptr<operation>, int> client_peer_task;
+
+    client *cl;
+    blocking_queue<client_peer_task> queue;
 
 public:
-    explicit client_peer(client* cl);
+    explicit client_peer(client *cl);
+    client_peer(const client_peer &) = delete;
+    client_peer(client_peer &&) = delete;
 
-    void on_ack(const operation& op, const int &new_server_state);
+    void send_ack(const std::shared_ptr<operation> &op, const int &new_server_state);
 
-    void on_receive(const operation& op, const int &new_server_state);
+    void send_update(const std::shared_ptr<operation> &op, const int &new_server_state);
+
+    // blocking method
+    void proceed_one_task();
+
+    int get_pending_queue_size() const;
 };
 
 

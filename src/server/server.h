@@ -55,11 +55,15 @@ private:
     std::unique_ptr<operations_history> history = std::make_unique<simple_history>();
 
 public:
+    server();
+
     std::tuple<int, std::shared_ptr<operation>, int> connect(
-            const std::shared_ptr<client_peer> &client, const int &last_known_state
+            client* cl, const int &last_known_state
     );
 
     void on_receive(const int &from_client_id, const std::shared_ptr<operation> &op, const int &parent_state);
+
+    std::shared_ptr<client_peer> get_peer(const int &client_id);
 };
 
 

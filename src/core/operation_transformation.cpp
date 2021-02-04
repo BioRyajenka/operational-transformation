@@ -6,6 +6,7 @@
 #include <cassert>
 #include "operation.h"
 #include "../client/document.h"
+#include "../testing/util/test_util.h"
 
 // TODO: проверить что во всех циклах не важно в каком порядке иду
 
@@ -35,67 +36,97 @@ void merge_chains(
 void apply_corrected_insert_operations(
         const node_id_t &search_initial_id,
         const std::shared_ptr<document> &root_state,
-        const std::unordered_map<node_id_t, chain> &insertions,
-        const operation &state_with_deletion,
+        const operation &op_with_insertion,
+        const operation &op_with_deletion,
         std::unordered_set<node_id_t> &processed,
         const std::shared_ptr<operation> &target
 ) {
     // validate that server_copy != nullptr
 
-    // сначала ищем prev_node, двигаясь сначала влева по удаленным,
-    // как только нашли не удаленную, двигаемся максимально вправо по инсертам, если есть
-    // в итоге prev_node - либо инсертнутая самая правая, либо не удаленная (в т.ч. корневая)
+    // сначала ищем новый корень, двигаясь сначала влево по удаленным. вершина не подходит,
+    // если она удалена любой из двух операций и из нее нет инсертов в op_with_deletion.
+    // если инсерты есть, новый корень - tail этих инсертов. если нет инсертов, но не удалена,
+    // то сама вершина.
 
-    // затем двигаемся начиная с k по удаленным вправо
+    // затем двигаемся начиная с этой вершины по всем вершинам, у которых, если бы в них был
+    // инсерт в op_with_insertion, новый корень был бы new_root
 
     // потом, стартуя с этой (правой) вершины, двигаемся влево по удаленным
-    // на каждой итерации, если в левой части есть инсерт в вершину, удаленную в правой части,
-    // добавляем операцию INSERT prev_node: цепочка инсерта
+    // на каждой итерации, если в op_with_insertions есть инсерт в вершину,
+    // которую мы сейчас рассматриваем (удаленную),
+    // добавляем операцию INSERT new root: цепочка инсерта
 
-    assert(state_with_deletion.get_deletions()->count(search_initial_id));
+    assert(op_with_deletion.get_deletions()->count(search_initial_id));
 
-    // first, find leftmost
+    // first, find new root
     node<symbol> const *initial_node = root_state->get_node(search_initial_id);
     assert(initial_node != nullptr);
 
     node<symbol> const *leftmost = initial_node;
-    while (state_with_deletion.get_deletions()->count(leftmost->value.id)) {
+//    printf("starting from %d\n", new_root->value.id);
+    while (!op_with_deletion.get_insertions()->count(leftmost->value.id) &&
+           (op_with_deletion.get_deletions()->count(leftmost->value.id)
+            || op_with_insertion.get_deletions()->count(leftmost->value.id))) {
         leftmost = leftmost->prev;
-        assert(leftmost && "Root node can't be deleted!");
+//        printf("going to %d\n", new_root->value.id);
+        assert(leftmost && "Document root can't be deleted!");
     }
 
-    const auto &tmp = state_with_deletion.get_insertions()->find(leftmost->value.id);
-    if (tmp != state_with_deletion.get_insertions()->end()) {
-        leftmost = tmp->second.get_tail();
+    node<symbol> const *new_root;
+    const auto &tmp = op_with_deletion.get_insertions()->find(leftmost->value.id);
+    if (tmp != op_with_deletion.get_insertions()->end()) {
+        new_root = tmp->second.get_tail();
+    } else {
+        new_root = leftmost;
     }
+//    printf("now going to %d\n", new_root->value.id);
 
-    // now, find rightmost deleted
+    // now, find rightmost node which can have new_root as new root in case
+    // of op_with_insertions insertions in that node
     node<symbol> const *cur = initial_node;
-    while (cur->next != nullptr && state_with_deletion.get_deletions()->count(cur->next->value.id)) {
+    while (cur->next != nullptr &&
+           (op_with_deletion.get_deletions()->count(cur->next->value.id)
+            || op_with_insertion.get_deletions()->count(cur->next->value.id))
+           && !op_with_deletion.get_insertions()->count(cur->value.id)) {
         cur = cur->next;
     }
 
     while (cur != leftmost) {
-        assert(cur != nullptr && state_with_deletion.get_deletions()->count(cur->value.id));
-        const auto &insertion = insertions.find(cur->value.id);
-        if (insertion != insertions.end()) {
+        assert(cur != nullptr);
+
+        if (!(op_with_deletion.get_deletions()->count(cur->value.id)
+              || op_with_insertion.get_deletions()->count(cur->value.id))) {
+//            print_doc("doc", *root_state);
+//            printf("new_root: %d (initial node %d)\n", new_root->value.id, search_initial_id);
+//            printf("cur: %d\n", cur->value.id);
+//            print_operation("op_with_deletion", op_with_deletion);
+//            print_operation("op_with_insertion", op_with_insertion);
+        }
+
+        assert(op_with_deletion.get_deletions()->count(cur->value.id)
+               || op_with_insertion.get_deletions()->count(cur->value.id));
+        assert(!op_with_deletion.get_insertions()->count(cur->value.id));
+        const auto &insertion = op_with_insertion.get_insertions()->find(cur->value.id);
+        if (insertion != op_with_insertion.get_insertions()->end()) {
             processed.insert(cur->value.id);
 
-            target->insert(leftmost->value.id, insertion->second);
+            target->insert(new_root->value.id, insertion->second);
         }
+        cur = cur->prev;
     }
 }
 
 void process_deleted_insertions(
-        const std::unordered_map<node_id_t, chain> &insertions,
-        const operation &state_with_deletion,
+        const operation &op_with_insertion,
+        const operation &op_with_deletion,
         const std::shared_ptr<document> &root_state,
         const std::shared_ptr<operation> &target
 ) {
     std::unordered_set<node_id_t> processed;
-    for (const auto&[k, ch]: insertions) {
-        if (state_with_deletion.get_deletions()->count(k) && !processed.count(k)) {
+    for (const auto&[node_id, ch]: *op_with_insertion.get_insertions()) {
+        if (op_with_deletion.get_deletions()->count(node_id) && !processed.count(node_id)) {
             assert(root_state != nullptr);
+            assert(!op_with_deletion.get_insertions()->count(node_id));
             // arguments:
             //  - starting position of search
             //  - root state
@@ -104,7 +135,7 @@ void process_deleted_insertions(
             //  - reference to set with processed node ids
             //  - target - op to apply operations over
             apply_corrected_insert_operations(
-                    k, root_state, insertions, state_with_deletion, processed, target
+                    node_id, root_state, op_with_insertion, op_with_deletion, processed, target
             );
         }
     }
@@ -167,6 +198,19 @@ void process_updates(
     }
 }
 
+void validate_insertion_starting_nodes_unique(const operation &a, const operation &b) {
+    std::unordered_set<node_id_t> temp;
+    for (const auto&[k, ch]: *a.get_insertions()) {
+        ch.iterate([&temp](const auto &s) {
+            assert(!temp.count(s.id));
+            temp.insert(s.id);
+        });
+    }
+    for (const auto&[k, ch]: *b.get_insertions()) {
+        assert(!temp.count(k));
+    }
+}
+
 /**
  * current invariant is that arguments can't be changed after invocation without affecting result
  * and result can be changed without affecting arguments
@@ -190,16 +234,7 @@ std::pair<std::shared_ptr<operation>, std::shared_ptr<operation>> operation::tra
     // === validating ops (only for debug) ===
 
     // validate all new nodes are unique
-    std::unordered_set<node_id_t> temp;
-    for (const auto&[k, ch]: insertions) {
-        ch.iterate([&temp](const auto &s) {
-            assert(!temp.count(s.id));
-            temp.insert(s.id);
-        });
-    }
-    for (const auto&[k, ch]: rhs.insertions) {
-        assert(!temp.count(k));
-    }
+    validate_insertion_starting_nodes_unique(*this, rhs);
 
     // validate deleted nodes can't be inserted or updated
     for (const auto &k: deletions) {
@@ -220,8 +255,8 @@ std::pair<std::shared_ptr<operation>, std::shared_ptr<operation>> operation::tra
     // === process insertions ===
 
     // deleted insertions first. it is important
-    if (!only_right_part) process_deleted_insertions(rhs.insertions, *this, root_state, left);
-    process_deleted_insertions(insertions, rhs, root_state, right);
+    if (!only_right_part) process_deleted_insertions(rhs, *this, root_state, left);
+    process_deleted_insertions(*this, rhs, root_state, right);
 
     // unique insertions
     if (!only_right_part) process_unique_insertions(rhs.insertions, *this, left);
@@ -239,19 +274,8 @@ std::pair<std::shared_ptr<operation>, std::shared_ptr<operation>> operation::tra
     //
     // unique insertions and deleted insertions' tailings also can overlap
 
-    // TODO:
-    //  !!! возможно тут чето не так
-    //      deleted insertions' tailings всегда идут первыми, но операции внутри
-    //      unique insertions не упорядочены относительно операций внутри common insertions' tailings
-    //      кажется что можно придумать такие (a.b) что a в unique, а (a.b) в common tailings или типа
-    //      того. тогда если будет еще какое-то c, то порядок (a.b).c и другой штуки будет разный...
-    //      короче, сложна
-    //      .
-    //      интуитивно, речь о том, что операции из левой части могут быть в той или иной группе
-    //      (common,unique,deleted) в зависимости от правой части. может это что-то сломать?
-    //      .
-    //      вроде нет: бывают пересечения только по (common,deleted) и (unique,deleted), а они
-    //      упорядочены
+    // === additional validation ===
+    if (!only_right_part) validate_insertion_starting_nodes_unique(*left, *right);
 
     return std::make_pair(left, right);
 }

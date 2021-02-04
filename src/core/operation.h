@@ -50,6 +50,8 @@ class operation {
     void rehang_insertions(const node_id_t &node_id, const std::shared_ptr<document> &root_state);
 
 public:
+    operation(const operation& op_to_copy);
+
     [[nodiscard]] std::unordered_set<node_id_t> const *get_deletions() const { return &deletions; };
     [[nodiscard]] std::unordered_map<node_id_t, int> const *get_updates() const { return &updates; };
     [[nodiscard]] std::unordered_map<node_id_t, chain> const *get_insertions() const { return &insertions; };

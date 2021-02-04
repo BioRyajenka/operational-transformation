@@ -6,14 +6,17 @@
 #include "client.h"
 #include "server_peer.h"
 #include "../server/server.h"
+#include "../testing/util/test_util.h"
 
 int client::free_node_id = 0;
 
 client::client(
-        const std::shared_ptr<server> &raw_serv,
-        const std::unique_ptr<std::function<void(const operation &)>> &operation_listener
-) : serv(raw_serv), operation_listener(operation_listener) {
-    const auto &[initial_op, serv_state] = serv.connect(this);
+        const std::shared_ptr<server_peer> &peer
+//        const std::unique_ptr<std::function<void(const operation &)>> &operation_listener
+) : peer(peer) {//, operation_listener(operation_listener) {
+    const auto &[client_id, initial_op, serv_state] = peer->connect(this);
+
+    this->client_id = client_id;
 
     server_doc = std::make_shared<document>();
     server_doc->apply(*initial_op);
@@ -48,7 +51,7 @@ void client::apply_user_op(const std::shared_ptr<operation> &op) {
         assert(!buffer && "Invariant is not satisfied! in_flight==null -> buffer==null");
         in_flight = op;
         validate_op_before_send(*in_flight, *server_doc);
-        serv.send(in_flight, last_known_server_state);
+        send_to_server(*in_flight, last_known_server_state);
         server_doc_plus_infl->apply(*in_flight);
     }
 }
@@ -59,14 +62,19 @@ void client::on_ack(const operation &op, const int &new_server_state) {
     last_known_server_state = new_server_state;
     server_doc->apply(op);
 
+//    print_doc("server_doc", *server_doc);
+//    print_doc("server_doc_plus_infl", *server_doc_plus_infl);
+
     assert(server_doc->hash() == server_doc_plus_infl->hash());
 
     if (buffer) {
         in_flight = buffer;
         validate_op_before_send(*in_flight, *server_doc);
-        serv.send(in_flight, last_known_server_state);
+        send_to_server(*in_flight, last_known_server_state);
         server_doc_plus_infl->apply(*in_flight);
         buffer = nullptr;
+    } else {
+        in_flight = nullptr;
     }
 }
 
@@ -107,8 +115,16 @@ void client::on_receive(const operation &op, const int &new_server_state) {
 }
 
 node<symbol> *client::generate_node(const int &value) {
-    if (serv.client_id == -1) {
+    if (client_id == -1) {
         throw std::runtime_error("Client is not connected");
     }
-    return new node<symbol>(nullptr, nullptr, symbol(serv.client_id, free_node_id++, value));
+    return new node<symbol>(nullptr, nullptr, symbol(client_id, free_node_id++, value));
+}
+
+void client::send_to_server(const operation &op, const int &parent_state) {
+    peer->send(client_id, op, parent_state);
+}
+
+int client::id() const {
+    return client_id;
 }

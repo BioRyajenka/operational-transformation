@@ -16,18 +16,14 @@
 class client {
 public:
     client(
-            const std::shared_ptr<server> &serv,
-            const std::unique_ptr<std::function<void(const operation &)>> &operation_listener
+            const std::shared_ptr<server_peer> &peer
+//            const std::unique_ptr<std::function<void(const operation &)>> &operation_listener
     );
 
 private:
-    server_peer serv;
-    // bridge from the latest known point in the server state
-    //  to the latest point in the client state
-//    operation bridge;
-    // а буффер - это как bridge, но без on-flight операции. потому что ее в таком виде нет на сервере
-    // буффер - это такая штука что (on-flight'+buffer) приведет в client-state.
-    // причем on-flight'=то, что придет в ack
+    int client_id;
+
+    std::shared_ptr<server_peer> peer;
 
     std::shared_ptr<operation> in_flight = nullptr;
 
@@ -38,7 +34,9 @@ private:
 
     static int free_node_id;
 
-    const std::unique_ptr<std::function<void(const operation &)>> &operation_listener;
+//    const std::unique_ptr<std::function<void(const operation &)>> &operation_listener;
+
+    void send_to_server(const operation &op, const int &parent_state);
 
 public:
     // public for testing
@@ -52,6 +50,8 @@ public:
     void on_receive(const operation &op, const int &new_server_state);
 
     node<symbol> *generate_node(const int &value);
+
+    int id() const;
 };
 
 

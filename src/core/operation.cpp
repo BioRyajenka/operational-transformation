@@ -9,6 +9,11 @@ static const int HASH_FLAG_INSERT = 1351727964;
 static const int HASH_FLAG_UPDATE = -472705117;
 static const int HASH_FLAG_DELETE = 3552447;
 
+operation::operation(const operation& op_to_copy) {
+    apply(op_to_copy, nullptr);
+    hasher.reset(op_to_copy.hash());
+}
+
 void operation::apply(const operation &rhs, const std::shared_ptr<document> &root_state) {
     for (const auto &node_id : rhs.deletions) del(node_id, root_state);
     for (const auto &[node_id, new_value] : rhs.updates) update(node_id, new_value);
@@ -101,7 +106,7 @@ ll operation::hash() const {
 std::shared_ptr<operation> operation::detach_unprocessable_by_server(const std::unordered_set<node_id_t> &dels) {
     std::shared_ptr<operation> x = nullptr;
     for (auto it = insertions.begin(); it != insertions.end();) {
-        if (deletions.count(it->first)) {
+        if (dels.count(it->first)) {
             if (x == nullptr) x = std::make_shared<operation>();
             x->insertions.emplace(it->first, std::move(it->second));
             it = insertions.erase(it);

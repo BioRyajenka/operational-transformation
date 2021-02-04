@@ -3,6 +3,7 @@
 //
 
 #include "document.h"
+#include "../testing/util/test_util.h"
 
 void document::apply(const operation &op) {
     // === validation (only for debug) ===
@@ -62,6 +63,8 @@ void document::undo_insertions(const std::unordered_map<node_id_t, chain> &inser
             cur = cur->next;
             c = c->next;
 
+            content_hash ^= tmp->value.id * tmp->value.value;
+            map.erase(tmp->value.id);
             data.remove_node(tmp);
         }
     }

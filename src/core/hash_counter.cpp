@@ -13,3 +13,7 @@ void hash_counter::apply_change(const int &change) {
 ll hash_counter::hash() const {
     return data;
 }
+
+void hash_counter::reset(const ll &new_value) {
+    data = new_value;
+}

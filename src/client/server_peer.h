@@ -11,20 +11,28 @@
 #include "../server/client_peer.h"
 
 class server;
+
 class client;
 
 class server_peer {
 private:
+    typedef std::tuple<int, std::shared_ptr<operation>, int> server_peer_task;
+
     std::shared_ptr<server> serv;
+    blocking_queue<server_peer_task> queue;
 
 public:
-    int client_id = -1; // receive id upon connect
-
     server_peer(const std::shared_ptr<server> &serv);
 
-    std::pair<std::shared_ptr<operation>, int> connect(client* client);
+    std::tuple<int, std::shared_ptr<operation>, int> connect(client *client);
 
-    void send(const std::shared_ptr<operation> &op, const int &parent_state);
+    // operation will be copied
+    void send(const int& client_id, const operation &op, const int &parent_state);
+
+    // blocking method
+    void proceed_one_task();
+
+    int get_pending_queue_size() const;
 };
 
 

@@ -13,6 +13,8 @@ class hash_counter {
 public:
     void apply_change(const int &change);
 
+    void reset(const ll &new_value);
+
     [[nodiscard]] ll hash() const;
 };
 
