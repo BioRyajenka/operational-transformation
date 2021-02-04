@@ -161,19 +161,7 @@ void run_in_one_thread(
 }
 
 int main() {
-    run_in_one_thread(0, 1, .5f, 10);
+    run_in_one_thread(0, 20, .99f, 10);
 //    run_in_one_thread(0, 2, .5f, 10);
     return 0;
 }
-
-//TEST_CASE ("2 clients, consuming events twice more often than producing") {
-//    run_in_one_thread(0, 1, .5f, 10);
-//}
-
-//TEST_CASE ("2 clients, as fast as possible") {
-//
-//}
-//
-//TEST_CASE ("20 clients, as fast as possible") {
-//
-//}

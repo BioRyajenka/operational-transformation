@@ -94,7 +94,8 @@ void process_deletions(
     for (const auto &[node_id, parent_id] : deletions) {
         const auto &rhs_del_node = rhs.get_deletions()->find(node_id);
         if (rhs_del_node != rhs.get_deletions()->end()) {
-            assert(rhs_del_node->second == parent_id);
+            // TODO: do we need this check?
+//            assert(rhs_del_node->second == parent_id);
         } else {
             const auto &rhs_ins = rhs.get_insertions()->find(parent_id);
 
