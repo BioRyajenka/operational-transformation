@@ -22,11 +22,6 @@ void operation::apply(const operation &rhs) {
 }
 
 void operation::insert(const node_id_t &node_id, const chain &chain_to_copy) {
-    if (deletions.count(node_id)) {
-        print_operation("op", *this);
-        fflush(stdout);
-    }
-
     assert(!deletions.count(node_id) && "Deleted nodes can't be inserted to");
 
 //    hasher.apply_change(HASH_FLAG_INSERT ^ (int)node_id ^ (int)chain_to_copy.get_head()->value.id ^ chain_to_copy.get_tail()->value.value);
@@ -69,7 +64,6 @@ void operation::update(const node_id_t &node_id, const int &new_value) {
 
 void operation::del(const node_id_t &node_id, const node_id_t &parent_id) {
     assert(!deletions.count(node_id));
-    assert(!deletions.count(parent_id));
 
 //    hasher.apply_change(HASH_FLAG_DELETE & (int)node_id);
 
@@ -79,16 +73,24 @@ void operation::del(const node_id_t &node_id, const node_id_t &parent_id) {
     }
 
     if (!insertions.count(node_id) && !deletions.count(node_id)) {
-        for (auto &[_, ch] : insertions) {
+        for (auto &[n_id, ch] : insertions) {
             // note: here is bottleneck. one can use hashmap in chain
             // to speedup node lookup, but it will require more memory
             const auto &n = ch.find_node(node_id);
             if (n) {
                 content_hash ^= node_id * n->value.value;
-                ch.remove_node(n);
+
+                if (n->prev == nullptr && n->next == nullptr) {
+                    insertions.erase(n_id);
+                } else {
+                    ch.remove_node(n);
+                }
+                return;
             }
         }
     }
+
+    assert(!deletions.count(parent_id));
 
     deletions.emplace(node_id, parent_id);
 

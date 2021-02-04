@@ -133,18 +133,51 @@ void client::do_update(const node_id_t &node_id, const int new_value) {
 }
 
 void client::do_delete(const node_id_t &node_id) {
+    node_id_t parent_id;
     auto it = server_doc->get_node(node_id);
-    assert(it);
 
-    node_id_t parent_id = it->prev->value.id;
-    if (in_flight) {
-        const auto &infl_deleted = in_flight->get_deletions()->find(parent_id);
-        if (infl_deleted != in_flight->get_deletions()->end()) {
-            parent_id = infl_deleted->second;
+    if (it) {
+        parent_id = it->prev->value.id;
+        if (in_flight) {
+            const auto &infl_deleted = in_flight->get_deletions()->find(parent_id);
+            if (infl_deleted != in_flight->get_deletions()->end()) {
+                parent_id = infl_deleted->second;
+            }
+            const auto &infl_inserted = in_flight->get_insertions()->find(parent_id);
+            if (infl_inserted != in_flight->get_insertions()->end()) {
+                parent_id = infl_inserted->second.get_tail()->value.id;
+            }
+
+            if (buffer) {
+                const auto &buf_deleted = buffer->get_deletions()->find(parent_id);
+                if (buf_deleted != buffer->get_deletions()->end()) {
+                    parent_id = buf_deleted->second;
+                }
+            }
         }
-        const auto &infl_inserted = in_flight->get_insertions()->find(parent_id);
-        if (infl_inserted != in_flight->get_insertions()->end()) {
-            parent_id = infl_inserted->second.get_tail()->value.id;
+    } else {
+        // TODO: я могу все-таки одновременно и в insertions и в deletions ноду держать?
+        // it is not in server_doc, which means it is either in in_flight or in buffer
+
+        assert(in_flight);
+
+        bool found_in_infl = false;
+        for (const auto &[n_id, ch] : *in_flight->get_insertions()) {
+            const auto &n = ch.find_node(node_id);
+            if (n) {
+                if (n == ch.get_head()) {
+                    parent_id = n_id;
+                } else {
+                    parent_id = n->prev->value.id;
+                }
+                found_in_infl = true;
+                break;
+            }
+        }
+
+        if (!found_in_infl) {
+            assert(buffer);
+            parent_id = -1; // it is not used, because node will be immediately deleted from the buffer
         }
     }
 

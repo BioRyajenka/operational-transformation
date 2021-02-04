@@ -161,7 +161,8 @@ void run_in_one_thread(
 }
 
 int main() {
-    run_in_one_thread(0, 2, .5f, 10);
+    run_in_one_thread(0, 1, .5f, 10);
+//    run_in_one_thread(0, 2, .5f, 10);
     return 0;
 }
 
