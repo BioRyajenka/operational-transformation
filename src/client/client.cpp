@@ -57,11 +57,6 @@ void client::apply_user_op(const std::shared_ptr<operation> &op) {
 }
 
 void client::on_ack(const operation &op, const int &new_server_state) {
-    if (op.hash() != in_flight->hash()) {
-        print_operation("op", op);
-        print_operation("in_flight", *in_flight);
-        fflush(stdout);
-    }
     assert(op.hash() == in_flight->hash() && "Acknowledged operation should be the same as predicted");
 
     server_doc->apply(op);

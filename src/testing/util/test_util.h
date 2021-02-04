@@ -15,6 +15,10 @@ symbol create_symbol(const node_id_t &id, const int &val);
 
 chain create_chain(std::initializer_list<node_id_t> ids);
 
+bool check_vectors_equal(const std::vector<node_id_t> &a, const std::vector<node_id_t> &b);
+
+std::vector<node_id_t> doc2vec(const document &doc);
+
 bool check_doc_ids(const document &doc, std::initializer_list<node_id_t> expected_list);
 
 template<typename T>

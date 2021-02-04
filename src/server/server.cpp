@@ -4,12 +4,13 @@
 
 #include "server.h"
 
-server::server() {
+server::server(const int& initial_doc_size) {
     std::shared_ptr<operation> op = std::make_shared<operation>();
     chain c = chain(symbol(0, 1, 1));
-    c.move_to_the_end(chain(symbol(0, 2, 2)));
-    c.move_to_the_end(chain(symbol(0, 3, 3)));
-    // it will be 999->1->2->3
+    for (int i = 2; i <= initial_doc_size; i++) {
+        c.move_to_the_end(chain(symbol(0, i, i)));
+    }
+    // it will be 999->1->2->3->...
     op->insert(symbol::initial.id, c);
     history->push(op);
 }

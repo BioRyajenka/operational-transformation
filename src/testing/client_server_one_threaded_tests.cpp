@@ -7,7 +7,6 @@
 #include <chrono>
 #include <random>
 #include <string>
-//#include "util/doctest.h"
 #include "util/magic_list.h"
 #include "../server/server.h"
 #include "../client/client.h"
@@ -23,48 +22,27 @@ void run_in_one_thread(
 ) {
     assert(producing_action_weight > 0. && producing_action_weight < 1.);
 
-    auto serv = std::make_shared<server>();
+    printf("Initializing...\n");
+    auto serv = std::make_shared<server>(initial_document_size);
+    printf("Server created\n");
     auto serv_peer = std::make_shared<server_peer>(serv);
 
     std::vector<std::pair<client *, std::shared_ptr<magic_list<node_id_t>>>> clients(clients_num);
     for (int i = 0; i < clients_num; i++) {
         auto ml = std::make_shared<magic_list<node_id_t>>();
         ml->insert(symbol::initial.id);
-        auto *cl = new client(serv_peer, [ml, i, &clients](const operation &op) {
-//            print_operation("client " + std::to_string(i + 1) + " applies operation", op);
+        auto *cl = new client(serv_peer, [ml](const operation &op) {
             for (const auto &[node_id, ch] : *op.get_insertions()) {
-                chain tmp = ch;
-                ch.iterate([ml, &tmp, &op](const auto &s) {
-                    if (ml->exists(s.id)) {
-//                        print_vector(ml->to_vector());
-//                        print_chain("ch", tmp);
-//                        print_operation("op", op);
-                        exit(0);
-//                    } else if (s.id == 134217728) {
-//                        print_vector(ml->to_vector());
-//                        print_chain("ch", tmp);
-//                        print_operation("op", op);
-//                        printf("\n");
-                    }
-                    ml->insert(s.id);
-                });
+                ch.iterate([ml](const auto &s) { ml->insert(s.id); });
             }
             for (const auto &[node_id, _] : *op.get_deletions()) {
                 ml->remove(node_id);
             }
 
-//            printf("his ml after that: ");
-//            print_vector(ml->to_vector());
-
-//            const auto &tmp3 = op.get_insertions()->find(0);
-//            if (tmp3 != op.get_insertions()->end() && tmp3->second.get_head()->value.id == 67108865) {
-//                printf("ml1: ");
-//                print_vector(clients[0].second->to_vector());
-//                printf("ml2: ");
-//                print_vector(clients[1].second->to_vector());
-//            }
         });
         clients[i] = std::make_pair(cl, ml);
+
+        printf("Client %d created\n", i);
     }
 
     ll operations_produced = 0;
@@ -74,6 +52,8 @@ void run_in_one_thread(
     std::uniform_int_distribution<int> consumer_roulette(0, clients.size()); // 0 will be the server
     std::uniform_real_distribution<double> dice(0., 1.);
     std::default_random_engine rand_engine;
+
+    printf("Initialization done. Starting simulation\n");
 
     std::chrono::steady_clock::time_point simulation_started = std::chrono::steady_clock::now();
     while (true) {
@@ -150,10 +130,16 @@ void run_in_one_thread(
     clock_t finalization_finished = clock();
 
     // === validating docs ===
-    ll gauge = clients[0].first->server_doc->hash();
-    for (int i = 1; i < (int) clients.size(); i++) {
-        assert(clients[i].first->server_doc->hash() == gauge);
+    printf("Validation...\n");
+//    ll gauge = clients[0].first->server_doc->hash();
+//    for (int i = 1; i < (int) clients.size(); i++) {
+//        assert(clients[i].first->server_doc->hash() == gauge);
+//    }
+    const auto &gauge = doc2vec(*clients[0].first->server_doc);
+    for (int i = 1; i < clients_num; i++) {
+        assert(check_vectors_equal(gauge, doc2vec(*clients[i].first->server_doc)));
     }
+    printf("Validation done. Each doc size is %d\n", gauge.size());
 
     // === ===
     printf("Each client produced %.3lf ops/sec at average\n", 1.0 * operations_produced / simulation_time /  20);
@@ -161,7 +147,7 @@ void run_in_one_thread(
 }
 
 int main() {
-    run_in_one_thread(0, 20, .99f, 10);
+    run_in_one_thread(10000, 20, .99f, 10);
 //    run_in_one_thread(0, 2, .5f, 10);
     return 0;
 }

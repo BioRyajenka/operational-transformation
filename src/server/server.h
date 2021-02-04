@@ -55,7 +55,7 @@ private:
     std::unique_ptr<operations_history> history = std::make_unique<simple_history>();
 
 public:
-    server();
+    server(const int& initial_doc_size);
 
     std::tuple<int, std::shared_ptr<operation>, int> connect(
             client* cl, const int &last_known_state

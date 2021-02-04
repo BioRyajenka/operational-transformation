@@ -23,7 +23,7 @@ chain create_chain(std::initializer_list<node_id_t> ids) {
     return res;
 }
 
-bool check_lists_equal(const std::vector<node_id_t> &a, const std::vector<node_id_t> &b) {
+bool check_vectors_equal(const std::vector<node_id_t> &a, const std::vector<node_id_t> &b) {
     if (a.size() != b.size()) return false;
     for (int i = 0; i < (int)a.size(); i++) {
         if (a[i] != b[i]) return false;
@@ -71,7 +71,7 @@ bool check_doc_ids(const document &doc, std::initializer_list<node_id_t> expecte
         expected.push_back(i);
     }
 
-    if (!check_lists_equal(actual, expected)) {
+    if (!check_vectors_equal(actual, expected)) {
         printf("expected: ");
         print_vector(expected);
         printf("actual  :");
