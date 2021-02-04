@@ -4,20 +4,20 @@
 
 #include <cassert>
 #include "client.h"
-#include "server_peer.h"
 #include "../server/server.h"
 #include "../testing/util/test_util.h"
 
 int client::free_node_id = 0;
 
 client::client(
-        const std::shared_ptr<server_peer> &peer
-//        const std::unique_ptr<std::function<void(const operation &)>> &operation_listener
-) : peer(peer) {//, operation_listener(operation_listener) {
+        const std::shared_ptr<server_peer> &peer,
+        const std::function<void(const operation &)> &operation_listener
+) : peer(peer), operation_listener(operation_listener) {
     const auto &[client_id, initial_op, serv_state] = peer->connect(this);
 
     this->client_id = client_id;
 
+    operation_listener(*initial_op);//    doc->apply(*op);
     server_doc = std::make_shared<document>();
     server_doc->apply(*initial_op);
     server_doc_plus_infl = std::make_shared<document>();
@@ -39,7 +39,7 @@ void validate_op_before_send(const operation &op, const document &server_doc) {
 }
 
 void client::apply_user_op(const std::shared_ptr<operation> &op) {
-//    doc->apply(*op);
+    operation_listener(*op);//    doc->apply(*op);
 
     if (in_flight) {
         if (buffer) {
@@ -97,16 +97,17 @@ void client::on_receive(const operation &op, const int &new_server_state) {
         in_flight = infl_transform.second;
 
         if (buffer) {
-            const auto &buff_transform = buffer->transform(*infl_transform.first, server_doc_plus_infl, true);
-//            doc->apply(*buff_transform.first);
+            // without doc, only_right_part can be false here
+            const auto &buff_transform = buffer->transform(*infl_transform.first, server_doc_plus_infl, false);
+            operation_listener(*buff_transform.first);//            doc->apply(*buff_transform.first);
             buffer = buff_transform.second;
         } else {
-//            doc->apply(*infl_transform.first);
+            operation_listener(*infl_transform.first);//            doc->apply(*infl_transform.first);
         }
         server_doc_plus_infl->apply(*infl_transform.first);
     } else {
         assert(!buffer && "Invariant is not satisfied! in_flight==null -> buffer==null");
-//        doc->apply(op);
+        operation_listener(op);//        doc->apply(op);
         server_doc_plus_infl->apply(op);
     }
 
@@ -114,11 +115,9 @@ void client::on_receive(const operation &op, const int &new_server_state) {
     server_doc->apply(op);
 }
 
-node<symbol> *client::generate_node(const int &value) {
-    if (client_id == -1) {
-        throw std::runtime_error("Client is not connected");
-    }
-    return new node<symbol>(nullptr, nullptr, symbol(client_id, free_node_id++, value));
+symbol client::generate_symbol(const int &value) {
+    assert(client_id != -1 && "Client is not connected");
+    return symbol(client_id, free_node_id++, value);
 }
 
 void client::send_to_server(const operation &op, const int &parent_state) {

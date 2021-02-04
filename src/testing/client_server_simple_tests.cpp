@@ -14,8 +14,8 @@
 TEST_CASE("client-server simple scenarios") {
     auto serv = std::make_shared<server>();
     auto serv_peer = std::make_shared<server_peer>(serv);
-    auto* cl1 = new client(serv_peer);
-    auto* cl2 = new client(serv_peer);
+    auto* cl1 = new client(serv_peer, [](const operation&){});
+    auto* cl2 = new client(serv_peer, [](const operation&){});
 
     SUBCASE("clients should have correct ids") {
         CHECK(cl1->id() == 1);

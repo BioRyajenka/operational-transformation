@@ -16,8 +16,8 @@
 class client {
 public:
     client(
-            const std::shared_ptr<server_peer> &peer
-//            const std::unique_ptr<std::function<void(const operation &)>> &operation_listener
+            const std::shared_ptr<server_peer> &peer,
+            const std::function<void(const operation &)> &operation_listener
     );
 
 private:
@@ -34,7 +34,7 @@ private:
 
     static int free_node_id;
 
-//    const std::unique_ptr<std::function<void(const operation &)>> &operation_listener;
+    const std::function<void(const operation &)> &operation_listener;
 
     void send_to_server(const operation &op, const int &parent_state);
 
@@ -49,7 +49,7 @@ public:
 
     void on_receive(const operation &op, const int &new_server_state);
 
-    node<symbol> *generate_node(const int &value);
+    symbol generate_symbol(const int &value);
 
     int id() const;
 };
