@@ -2,6 +2,7 @@
 // Created by Igor on 31.01.2021.
 //
 
+#include <string>
 #include <cassert>
 #include "client.h"
 #include "../server/server.h"
@@ -50,13 +51,18 @@ void client::apply_user_op(const std::shared_ptr<operation> &op) {
     } else {
         assert(!buffer && "Invariant is not satisfied! in_flight==null -> buffer==null");
         in_flight = op;
-        validate_op_before_send(*in_flight, *server_doc);
         send_to_server(*in_flight, last_known_server_state);
         server_doc_plus_infl->apply(*in_flight);
     }
 }
 
 void client::on_ack(const operation &op, const int &new_server_state) {
+    if (op.hash() != in_flight->hash()) {
+        print_operation("op", op);
+        print_operation("in_flight", *in_flight);
+        print_doc("server_doc", *server_doc);
+        fflush(stdout);
+    }
     assert(op.hash() == in_flight->hash() && "Acknowledged operation should be the same as predicted");
 
     last_known_server_state = new_server_state;
@@ -69,7 +75,6 @@ void client::on_ack(const operation &op, const int &new_server_state) {
 
     if (buffer) {
         in_flight = buffer;
-        validate_op_before_send(*in_flight, *server_doc);
         send_to_server(*in_flight, last_known_server_state);
         server_doc_plus_infl->apply(*in_flight);
         buffer = nullptr;
@@ -115,12 +120,16 @@ void client::on_receive(const operation &op, const int &new_server_state) {
     server_doc->apply(op);
 }
 
-symbol client::generate_symbol(const int &value) {
+symbol client::generate_symbol(const int &value) const {
     assert(client_id != -1 && "Client is not connected");
-    return symbol(client_id, free_node_id++, value);
+    const symbol &res = symbol(client_id, free_node_id++, value);
+//    printf("client %d generated symbol %d\n", client_id, res.id);
+    return res;
 }
 
 void client::send_to_server(const operation &op, const int &parent_state) {
+    validate_op_before_send(*in_flight, *server_doc);
+//    print_operation("client " + std::to_string(client_id) + " sends operation", op);
     peer->send(client_id, op, parent_state);
 }
 

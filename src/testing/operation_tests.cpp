@@ -42,4 +42,11 @@ TEST_CASE("operation") {
         CHECK(doc->get_node(0)->next == doc->get_node(2));
         CHECK(doc->get_node(2)->next == nullptr);
     }
+
+    SUBCASE("inserting into new node") {
+        auto op = std::make_shared<operation>();
+        op->insert(1, create_chain({2}));
+        base_op.apply(*op, nullptr);
+        CHECK(base_op.get_insertions()->find(0)->second.get_tail()->value.id == 2);
+    }
 }

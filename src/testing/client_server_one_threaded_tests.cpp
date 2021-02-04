@@ -6,10 +6,12 @@
 #include <vector>
 #include <chrono>
 #include <random>
-#include "util/doctest.h"
+#include <string>
+//#include "util/doctest.h"
 #include "util/magic_list.h"
 #include "../server/server.h"
 #include "../client/client.h"
+#include "util/test_util.h"
 
 static const int TYPE_DELETE = 0;
 static const int TYPE_INSERT = 1;
@@ -28,13 +30,39 @@ void run_in_one_thread(
     for (int i = 0; i < clients_num; i++) {
         auto ml = std::make_shared<magic_list<node_id_t>>();
         ml->insert(symbol::initial.id);
-        auto *cl = new client(serv_peer, [&ml](const operation &op) {
+        auto *cl = new client(serv_peer, [ml, i, &clients](const operation &op) {
+//            print_operation("client " + std::to_string(i + 1) + " applies operation", op);
             for (const auto &[node_id, ch] : *op.get_insertions()) {
-                ch.iterate([&ml](const auto &s) { ml->insert(s.id); });
+                chain tmp = ch;
+                ch.iterate([ml, &tmp, &op](const auto &s) {
+                    if (ml->exists(s.id)) {
+//                        print_vector(ml->to_vector());
+//                        print_chain("ch", tmp);
+//                        print_operation("op", op);
+                        exit(0);
+//                    } else if (s.id == 134217728) {
+//                        print_vector(ml->to_vector());
+//                        print_chain("ch", tmp);
+//                        print_operation("op", op);
+//                        printf("\n");
+                    }
+                    ml->insert(s.id);
+                });
             }
             for (const auto &node_id : *op.get_deletions()) {
                 ml->remove(node_id);
             }
+
+//            printf("his ml after that: ");
+//            print_vector(ml->to_vector());
+
+//            const auto &tmp3 = op.get_insertions()->find(0);
+//            if (tmp3 != op.get_insertions()->end() && tmp3->second.get_head()->value.id == 67108865) {
+//                printf("ml1: ");
+//                print_vector(clients[0].second->to_vector());
+//                printf("ml2: ");
+//                print_vector(clients[1].second->to_vector());
+//            }
         });
         clients[i] = std::make_pair(cl, ml);
     }
@@ -63,8 +91,8 @@ void run_in_one_thread(
 
             auto &[cl, ml] = clients[dice(rand_engine) * clients.size()];
             auto op = std::make_shared<operation>();
-            int op_type = operation_type_generator(rand_engine);
             node_id_t random_node_id = ml->get_random();
+            int op_type = random_node_id == symbol::initial.id ? TYPE_INSERT : operation_type_generator(rand_engine);
 
             if (op_type == TYPE_UPDATE) {
                 op->update(random_node_id, value_generator(rand_engine));
@@ -74,6 +102,9 @@ void run_in_one_thread(
                 op->insert(random_node_id, chain(cl->generate_symbol(value_generator(rand_engine))));
             }
 
+//            printf("client %d arises operation", cl->id());
+//            print_operation("", *op);
+
             cl->apply_user_op(op);
             operations_produced++;
         } else {
@@ -82,16 +113,20 @@ void run_in_one_thread(
             int initial_roulette_result = consumer_roulette(rand_engine);
             int roulette_result = initial_roulette_result;
             while (roulette_result == 0 && !serv_peer->get_pending_queue_size()
-                   || !serv->get_peer(clients[roulette_result - 1].first->id())->get_pending_queue_size()) {
+                   || roulette_result && !serv->get_peer(clients[roulette_result - 1].first->id())->get_pending_queue_size()) {
                 roulette_result = (roulette_result + 1) % (clients_num + 1);
                 assert(roulette_result != initial_roulette_result);
             }
 
             if (roulette_result == 0) {
+//                printf("server consumes operation\n");
+
                 // serv
                 assert(serv_peer->get_pending_queue_size());
                 serv_peer->proceed_one_task();
             } else {
+//                printf("client %d consumes operation\n", roulette_result);
+
                 assert(serv->get_peer(clients[roulette_result - 1].first->id())->get_pending_queue_size());
                 serv->get_peer(clients[roulette_result - 1].first->id())->proceed_one_task();
             }
@@ -118,25 +153,30 @@ void run_in_one_thread(
 
     // === validating docs ===
     ll gauge = clients[0].first->server_doc->hash();
-    CHECK(clients[0].first->server_doc_plus_infl->hash() == gauge);
+    assert(clients[0].first->server_doc_plus_infl->hash() == gauge);
     for (int i = 1; i < (int) clients.size(); i++) {
-        CHECK(clients[i].first->server_doc->hash() == gauge);
-        CHECK(clients[i].first->server_doc_plus_infl->hash() == gauge);
+        assert(clients[i].first->server_doc->hash() == gauge);
+        assert(clients[i].first->server_doc_plus_infl->hash() == gauge);
     }
 
     // === ===
-    printf("Each client produced %lf ops/sec at average", 1.0 * simulation_time / operations_produced /  20);
-    printf("Final synchronization took %.3lf seconds", 1. * (finalization_finished - finalization_started) / CLOCKS_PER_SEC);
+    printf("Each client produced %.3lf ops/sec at average\n", 1.0 * operations_produced / simulation_time /  20);
+    printf("Final synchronization took %.8lf seconds", 1. * (finalization_finished - finalization_started) / CLOCKS_PER_SEC);
 }
 
-TEST_CASE ("2 clients, consuming events twice more often than producing") {
-    run_in_one_thread(0, 1, .5f, 10);
+int main() {
+    run_in_one_thread(0, 2, .5f, 10);
+    return 0;
 }
 
-TEST_CASE ("2 clients, as fast as possible") {
+//TEST_CASE ("2 clients, consuming events twice more often than producing") {
+//    run_in_one_thread(0, 1, .5f, 10);
+//}
 
-}
-
-TEST_CASE ("20 clients, as fast as possible") {
-
-}
+//TEST_CASE ("2 clients, as fast as possible") {
+//
+//}
+//
+//TEST_CASE ("20 clients, as fast as possible") {
+//
+//}

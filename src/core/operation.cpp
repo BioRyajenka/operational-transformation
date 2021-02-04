@@ -25,11 +25,23 @@ void operation::insert(const node_id_t &node_id, const chain &chain_to_copy) {
 
     hasher.apply_change(HASH_FLAG_INSERT ^ (int)node_id ^ (int)chain_to_copy.get_head()->value.id ^ chain_to_copy.get_tail()->value.value);
 
-    const auto &ch = insertions.find(node_id);
-    if (ch != insertions.end()) {
-        ch->second.copy_to_the_beginning(chain_to_copy);
+    const auto &existing_chain = insertions.find(node_id);
+    if (existing_chain != insertions.end()) {
+        existing_chain->second.copy_to_the_beginning(chain_to_copy);
     } else {
-        insertions.emplace(node_id, chain_to_copy); // copying here, not moving
+        // check if node_id is in some chain or totally new
+        bool chain_found = false;
+        for (auto &[n_id, ch] : insertions) {
+            auto node = ch.find_node(node_id);
+            if (node != nullptr) {
+                ch.copy_to(node, chain_to_copy);
+                chain_found = true;
+                break;
+            }
+        }
+        if (!chain_found) {
+            insertions.emplace(node_id, chain_to_copy); // copying here, not moving
+        }
     }
 }
 
