@@ -15,6 +15,10 @@ class simple_history : public operations_history {
     std::vector<std::shared_ptr<operation>> stack;
 
 public:
+    ~simple_history() override {
+        stack.clear();
+    }
+
     void push(const std::shared_ptr<operation> &op) override {
         stack.push_back(op);
     };

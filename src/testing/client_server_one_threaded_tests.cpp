@@ -7,10 +7,10 @@
 #include <chrono>
 #include <random>
 #include <string>
+#include <climits>
 #include "util/magic_list.h"
 #include "../server/server.h"
 #include "../client/client.h"
-#include "util/test_util.h"
 
 static const int TYPE_DELETE = 0;
 static const int TYPE_INSERT = 1;
@@ -139,15 +139,18 @@ void run_in_one_thread(
     for (int i = 1; i < clients_num; i++) {
         assert(check_vectors_equal(gauge, doc2vec(*clients[i].first->server_doc)));
     }
-    printf("Validation done. Each doc size is %d\n", gauge.size());
+    printf("Validation done. Each doc size is %d\n", (int) gauge.size());
+
+    // === clean up ===
+    for (const auto &cl : clients) delete cl.first;
 
     // === ===
     printf("Each client produced %.3lf ops/sec at average\n", 1.0 * operations_produced / simulation_time /  20);
-    printf("Final synchronization took %.8lf seconds", 1. * (finalization_finished - finalization_started) / CLOCKS_PER_SEC);
+    printf("Final synchronization took %.8lf seconds\n", (double) (finalization_finished - finalization_started) / CLOCKS_PER_SEC);
 }
 
 int main() {
-    run_in_one_thread(10000, 20, .99f, 10);
+    run_in_one_thread(1000, 20, .99f, 0);
 //    run_in_one_thread(0, 2, .5f, 10);
     return 0;
 }

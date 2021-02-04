@@ -10,6 +10,8 @@
 
 class operations_history {
 public:
+    virtual ~operations_history() {}
+
     virtual void push(const std::shared_ptr<operation> &op) = 0;
     [[nodiscard]] virtual std::shared_ptr<operation> fetch(const int &from) const = 0;
     // returns last state, which is = to the state, to which last op is pointing
