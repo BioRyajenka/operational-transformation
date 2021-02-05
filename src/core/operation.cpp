@@ -62,7 +62,7 @@ void operation::update(const node_id_t &node_id, const int &new_value) {
     updates.emplace(node_id, new_value).first->second = new_value;
 }
 
-void operation::del(const node_id_t &node_id, const node_id_t &parent_id) {
+void operation::del(const node_id_t &node_id, node_id_t parent_id) {
     assert(!deletions.count(node_id));
 
 //    hasher.apply_change(HASH_FLAG_DELETE & (int)node_id);
@@ -88,6 +88,15 @@ void operation::del(const node_id_t &node_id, const node_id_t &parent_id) {
                 return;
             }
         }
+    }
+
+    if (deletions.count(parent_id)) {
+//        print_operation("this", *this);
+//        printf("node_id %u parent_id %u\n", node_id, parent_id);
+//        fflush(stdout);
+        // TODO: why is it possible?
+
+        parent_id = deletions.at(parent_id);
     }
 
     assert(!deletions.count(parent_id));

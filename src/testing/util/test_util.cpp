@@ -86,19 +86,19 @@ void print_operation(const std::string &prefix, const operation &op) {
     printf("%s: \n", prefix.c_str());
 
     printf(" deletions: ");
-    for (const auto &[node_id, parent_id]: *op.get_deletions()) printf("%d(%d) ", node_id, parent_id);
+    for (const auto &[node_id, parent_id]: *op.get_deletions()) printf("%u(%u) ", node_id, parent_id);
 
     printf("\n insertions: ");
     for (const auto &[node_id, ch]: *op.get_insertions()) {
         const std::vector<node_id_t> &v = chain2vec(ch);
-        printf("[%d: %d", node_id, v[0]);
-        for (int i = 1; i < (int) v.size(); i++) printf("->%d", v[i]);
+        printf("[%u: %u", node_id, v[0]);
+        for (int i = 1; i < (int) v.size(); i++) printf("->%u", v[i]);
         printf("] ");
     }
 
     printf("\n updates: ");
     for (const auto &[node_id, new_value]: *op.get_updates()) {
-        printf("[%d: %d] ", node_id, new_value);
+        printf("[%u: %d] ", node_id, new_value);
     }
     printf("\n");
 }

@@ -79,7 +79,7 @@ public:
     void update(const node_id_t &node_id, const int& new_value);
 
     // fast versions, slightly faster than 'apply', as it don't require intermediate objects
-    void del(const node_id_t &node_id, const node_id_t &parent_id);
+    void del(const node_id_t &node_id, node_id_t parent_id);
 
     // only for validation purposes. should be precalculated
     ll hash() const;
