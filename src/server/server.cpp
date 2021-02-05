@@ -4,7 +4,7 @@
 
 #include "server.h"
 
-server::server(const int& initial_doc_size) {
+server::server(const int& initial_doc_size, const std::shared_ptr<operations_history> &history) : history(history) {
     std::shared_ptr<operation> op = std::make_shared<operation>();
     chain c = chain(symbol(0, 1, 1));
     for (int i = 2; i <= initial_doc_size; i++) {

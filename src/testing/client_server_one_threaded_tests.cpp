@@ -11,11 +11,15 @@
 #include "util/magic_list.h"
 #include "../server/server.h"
 #include "../client/client.h"
+#include "util/test_util.h"
+#include "../server/history/simple_history.h"
+#include "../server/history/jumping_history.h"
 
 static const int TYPE_DELETE = 0;
 static const int TYPE_INSERT = 1;
 static const int TYPE_UPDATE = 2;
 
+template<typename T>
 void run_in_one_thread(
         const int &initial_document_size,
         const int &clients_num, const double &producing_action_weight, const int &simulation_time
@@ -27,7 +31,7 @@ void run_in_one_thread(
     }
 
     printf("Initializing...\n");
-    auto serv = std::make_shared<server>(initial_document_size);
+    auto serv = std::make_shared<server>(initial_document_size, std::make_shared<T>());
     printf("Server created\n");
     auto serv_peer = std::make_shared<server_peer>(serv);
 
@@ -148,17 +152,21 @@ void run_in_one_thread(
 }
 
 int main() {
-    run_in_one_thread(1000, 2000, .99f, 10);
+    run_in_one_thread<simple_history>(1000, 20, .99f, 10);
+//    run_in_one_thread<jumping_history>(1000, 20, .99f, 10);
     /**
+     * With simple_history:
+     *
      * для 20 клиентов
      * Each client produced 832.140 ops/sec at average
      * Final synchronization took 0.00100000 seconds
-     */
-    /**
+     *
      * для 2к клиентов
      * Each client produced 8.610 ops/sec at average
      * Final synchronization took 2.7730000 seconds
+     *
+     * With jumping history:
+     * 58.285 ops/sec; 8.0 ops/sec respectively
      */
-//    run_in_one_thread(0, 2, .5f, 10);
     return 0;
 }
