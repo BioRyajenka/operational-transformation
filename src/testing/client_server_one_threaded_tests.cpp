@@ -17,10 +17,14 @@ static const int TYPE_INSERT = 1;
 static const int TYPE_UPDATE = 2;
 
 void run_in_one_thread(
-        const int &initial_document_size, // TODO
+        const int &initial_document_size,
         const int &clients_num, const double &producing_action_weight, const int &simulation_time
 ) {
     assert(producing_action_weight > 0. && producing_action_weight < 1.);
+    if (clients_num >> 11) {
+        printf("Max allowed clients is %d! Increase limit in symbol.cpp\n", clients_num);
+        exit(-1);
+    }
 
     printf("Initializing...\n");
     auto serv = std::make_shared<server>(initial_document_size);
@@ -49,7 +53,6 @@ void run_in_one_thread(
 
     std::uniform_int_distribution<int> value_generator(INT_MIN, INT_MAX);
     std::uniform_int_distribution<int> operation_type_generator(0, 2);
-    std::uniform_int_distribution<int> consumer_roulette(0, clients.size()); // 0 will be the server
     std::uniform_real_distribution<double> dice(0., 1.);
     std::default_random_engine rand_engine;
 
@@ -81,32 +84,24 @@ void run_in_one_thread(
                 cl->do_insert(random_node_id, value_generator(rand_engine));
             }
 
-//            printf("client %d arises operation", cl->id());
-//            print_operation("", *op);
-
             operations_produced++;
         } else {
             // consuming on one of the clients or on the server
 
-            int initial_roulette_result = consumer_roulette(rand_engine);
-            int roulette_result = initial_roulette_result;
-            while (roulette_result == 0 && !serv_peer->get_pending_queue_size()
-                   || roulette_result && !serv->get_peer(clients[roulette_result - 1].first->id())->get_pending_queue_size()) {
-                roulette_result = (roulette_result + 1) % (clients_num + 1);
-                assert(roulette_result != initial_roulette_result);
+            bool client_processed = false;
+            int roulette_result = (int) (dice(rand_engine) * events_to_consume);
+            for (const auto &cl : clients) {
+                roulette_result -= serv->get_peer(cl.first->id())->get_pending_queue_size();
+                if (serv->get_peer(cl.first->id())->get_pending_queue_size() && roulette_result <= 0) {
+                    serv->get_peer(cl.first->id())->proceed_one_task();
+                    client_processed = true;
+                    break;
+                }
             }
 
-            if (roulette_result == 0) {
-//                printf("server consumes operation\n");
-
-                // serv
+            if (!client_processed) {
                 assert(serv_peer->get_pending_queue_size());
                 serv_peer->proceed_one_task();
-            } else {
-//                printf("client %d consumes operation\n", roulette_result);
-
-                assert(serv->get_peer(clients[roulette_result - 1].first->id())->get_pending_queue_size());
-                serv->get_peer(clients[roulette_result - 1].first->id())->proceed_one_task();
             }
         }
     }
@@ -114,6 +109,9 @@ void run_in_one_thread(
     // === finalization ===
     clock_t finalization_started = clock();
     while (true) {
+//        printf("Server queue size: %d\n", serv_peer->get_pending_queue_size());
+//        fflush(stdout);
+
         bool modified = false;
         while (serv_peer->get_pending_queue_size()) {
             serv_peer->proceed_one_task();
@@ -150,7 +148,17 @@ void run_in_one_thread(
 }
 
 int main() {
-    run_in_one_thread(1000, 20, .99f, 0);
+    run_in_one_thread(1000, 2000, .99f, 10);
+    /**
+     * для 20 клиентов
+     * Each client produced 832.140 ops/sec at average
+     * Final synchronization took 0.00100000 seconds
+     */
+    /**
+     * для 2к клиентов
+     * Each client produced 8.610 ops/sec at average
+     * Final synchronization took 2.7730000 seconds
+     */
 //    run_in_one_thread(0, 2, .5f, 10);
     return 0;
 }
