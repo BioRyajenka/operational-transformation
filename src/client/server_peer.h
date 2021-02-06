@@ -22,9 +22,11 @@ private:
     blocking_queue<server_peer_task> queue;
 
 public:
-    server_peer(const std::shared_ptr<server> &serv);
+    server_peer(std::shared_ptr<server> serv);
 
-    std::tuple<int, std::shared_ptr<operation>, int> connect(client *client);
+    std::pair<std::shared_ptr<operation>, int> connect(client *client, const int &last_known_state);
+
+    void disconnect(const int &client_id);
 
     // operation will be copied
     void send(const int& client_id, const operation &op, const int &parent_state);

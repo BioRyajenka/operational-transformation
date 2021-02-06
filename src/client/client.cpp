@@ -4,25 +4,20 @@
 
 #include <string>
 #include <cassert>
+#include <utility>
 #include "client.h"
 #include "../server/server.h"
-#include "../testing/util/test_util.h"
 
 int client::free_node_id = 0;
 
 client::client(
-        const std::shared_ptr<server_peer> &peer,
-        const std::function<void(const operation &)> &operation_listener
-) : peer(peer), operation_listener(operation_listener) {
-    const auto &[client_id, initial_op, serv_state] = peer->connect(this);
-
+        const int &client_id,
+        std::function<void(const operation &)> operation_listener
+) : operation_listener(std::move(operation_listener)) {
+    assert(client_id > 0 && "Client id should be positive!");
     this->client_id = client_id;
-
-    operation_listener(*initial_op);//    doc->apply(*op);
-
     server_doc = std::make_shared<document>();
-    server_doc->apply(*initial_op);
-    last_known_server_state = serv_state;
+    last_known_server_state = 0;
 }
 
 void validate_against_state(const operation &op, const document &state) {
@@ -40,8 +35,31 @@ void validate_against_state(const operation &op, const document &state) {
     }
 }
 
+void client::connect(const std::shared_ptr<server_peer> &serv_peer) {
+    peer = serv_peer;
+    const auto &[initial_op, serv_state] = peer->connect(this, last_known_server_state);
+    in_flight = std::make_shared<operation>(); // new empty operation
+    on_receive(*initial_op, serv_state);
+    on_ack(*in_flight, serv_state);// acknowledged empty
+}
+
+void client::disconnect() {
+    peer->disconnect(client_id);
+    assert(!in_flight);
+    assert(!buffer);
+    peer = nullptr;
+}
+
 void client::apply_user_op(const std::shared_ptr<operation> &op) {
     operation_listener(*op);//    doc->apply(*op);
+
+    if (!peer) { // not connected
+        if (buffer) {
+            buffer->apply(*op);
+        } else buffer = op;
+
+        return;
+    }
 
     if (in_flight) {
         if (buffer) {
@@ -50,7 +68,7 @@ void client::apply_user_op(const std::shared_ptr<operation> &op) {
             buffer = op;
         }
     } else {
-        assert(!buffer && "Invariant is not satisfied! in_flight==null -> buffer==null");
+        assert(!buffer && "Invariant is not satisfied! connected -> in_flight==null -> buffer==null");
         in_flight = op;
         send_to_server(*in_flight, last_known_server_state);
     }
@@ -61,8 +79,6 @@ void client::on_ack(const operation &op, const int &new_server_state) {
 
     server_doc->apply(op);
     last_known_server_state = new_server_state;
-//    print_doc("server_doc", *server_doc);
-//    print_doc("server_doc_plus_infl", *server_doc_plus_infl);
 
     if (buffer) {
         in_flight = buffer;
@@ -106,6 +122,7 @@ symbol client::generate_symbol(const int &value) const {
 }
 
 void client::send_to_server(const operation &op, const int &parent_state) {
+    assert(peer);
     validate_against_state(*in_flight, *server_doc);
 //    print_operation("client " + std::to_string(client_id) + " sends an operation", op);
     peer->send(client_id, op, parent_state);
@@ -129,10 +146,10 @@ void client::do_update(const node_id_t &node_id, const int new_value) {
 
 void client::do_delete(const node_id_t &node_id) {
     node_id_t parent_id;
-    auto it = server_doc->get_node(node_id);
+    auto node_in_doc = server_doc->get_node(node_id);
 
-    if (it) {
-        parent_id = it->prev->value.id;
+    if (node_in_doc) {
+        parent_id = node_in_doc->prev->value.id;
         if (in_flight) {
             const auto &infl_deleted = in_flight->get_deletions()->find(parent_id);
             if (infl_deleted != in_flight->get_deletions()->end()) {
@@ -154,19 +171,22 @@ void client::do_delete(const node_id_t &node_id) {
         // TODO: я могу все-таки одновременно и в insertions и в deletions ноду держать?
         // it is not in server_doc, which means it is either in in_flight or in buffer
 
-        assert(in_flight);
-
         bool found_in_infl = false;
-        for (const auto &[n_id, ch] : *in_flight->get_insertions()) {
-            const auto &n = ch.find_node(node_id);
-            if (n) {
-                if (n == ch.get_head()) {
-                    parent_id = n_id;
-                } else {
-                    parent_id = n->prev->value.id;
+
+        if (peer) { // if connected
+            assert(in_flight);
+
+            for (const auto &[n_id, ch] : *in_flight->get_insertions()) {
+                const auto &n = ch.find_node(node_id);
+                if (n) {
+                    if (n == ch.get_head()) {
+                        parent_id = n_id;
+                    } else {
+                        parent_id = n->prev->value.id;
+                    }
+                    found_in_infl = true;
+                    break;
                 }
-                found_in_infl = true;
-                break;
             }
         }
 

@@ -15,27 +15,13 @@ class simple_history : public operations_history {
     std::vector<std::shared_ptr<operation>> stack;
 
 public:
-    ~simple_history() override {
-        stack.clear();
-    }
+    ~simple_history() override;
 
-    void push(const std::shared_ptr<operation> &op) override {
-        stack.push_back(op);
-    };
+    void push(const std::shared_ptr<operation> &op) override;
 
-    [[nodiscard]] std::shared_ptr<operation> fetch(const int &from) const override {
-        assert(from >= 0 && from < stack.size());
-        std::shared_ptr<operation> op = std::make_shared<operation>();
+    [[nodiscard]] std::shared_ptr<operation> fetch(const int &from) const override;
 
-        for (int i = from; i < stack.size(); i++) {
-            op->apply(*stack[i]);
-        }
-        return op;
-    };
-
-    [[nodiscard]] int last_state() const override {
-        return (int) stack.size();
-    }
+    [[nodiscard]] int last_state() const override;
 };
 
 

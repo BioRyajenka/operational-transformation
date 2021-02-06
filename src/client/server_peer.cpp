@@ -3,13 +3,17 @@
 //
 
 #include "server_peer.h"
+#include <utility>
 #include "../server/server.h"
 
-server_peer::server_peer(const std::shared_ptr<server> &serv) : serv(serv) {}
+server_peer::server_peer(std::shared_ptr<server> serv) : serv(std::move(serv)) {}
 
-std::tuple<int, std::shared_ptr<operation>, int> server_peer::connect(client *client) {
-    int last_known_state = 0; // load from scratch
+std::pair<std::shared_ptr<operation>, int> server_peer::connect(client *client, const int &last_known_state) {
     return serv->connect(client, last_known_state);
+}
+
+void server_peer::disconnect(const int &client_id) {
+    serv->disconnect(client_id);
 }
 
 void server_peer::send(const int& client_id, const operation &op, const int &parent_state) {

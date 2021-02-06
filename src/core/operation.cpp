@@ -3,8 +3,6 @@
 //
 
 #include "operation.h"
-#include "../client/document.h"
-#include "../testing/util/test_util.h"
 
 static const int HASH_FLAG_INSERT = 1351727964;
 static const int HASH_FLAG_UPDATE = -472705117;
@@ -91,12 +89,14 @@ void operation::del(const node_id_t &node_id, node_id_t parent_id) {
     }
 
     if (deletions.count(parent_id)) {
-//        print_operation("this", *this);
-//        printf("node_id %u parent_id %u\n", node_id, parent_id);
-//        fflush(stdout);
-        // TODO: why is it possible?
-
         parent_id = deletions.at(parent_id);
+    }
+
+    for (auto &[node_id, ch] : insertions) {
+        if (ch.get_tail()->value.id == parent_id) {
+            parent_id = node_id;
+            break;
+        }
     }
 
     assert(!deletions.count(parent_id));
@@ -124,8 +124,21 @@ void operation::rehang_insertions(const node_id_t &from_node_id, const node_id_t
         // chain already exists
         target_chain->second.move_to_the_end(std::move(source_chain));
     } else {
-        // creating new chain
-        insertions.emplace(to_node_id, std::move(source_chain));
+        // to_node may be the end of one of the chains
+
+        bool was_rehanged = false;
+        for (auto &[node_id, ch] : insertions) {
+            if (ch.get_tail()->value.id == to_node_id) {
+                ch.move_to_the_end(std::move(source_chain));
+                was_rehanged = true;
+                break;
+            }
+        }
+
+        if (!was_rehanged) {
+            // creating new chain
+            insertions.emplace(to_node_id, std::move(source_chain));
+        }
     }
     insertions.erase(from_node_id);
 }

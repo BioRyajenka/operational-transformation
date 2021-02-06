@@ -3,6 +3,7 @@
 //
 
 #include "server.h"
+#include "../client/client.h"
 
 server::server(const int& initial_doc_size, const std::shared_ptr<operations_history> &history) : history(history) {
     std::shared_ptr<operation> op = std::make_shared<operation>();
@@ -15,16 +16,22 @@ server::server(const int& initial_doc_size, const std::shared_ptr<operations_his
     history->push(op);
 }
 
-std::tuple<int, std::shared_ptr<operation>, int> server::connect(
-        client* cl, const int &last_known_state
-) {
-    clients.emplace_back(std::make_shared<client_peer>(cl));
-//clients.push_back(client_peer(client));
-    int client_id = (int) clients.size(); // 0th client is a server
-
+std::pair<std::shared_ptr<operation>, int> server::connect(client* cl, const int &last_known_state) {
+    assert(!clients.count(cl->id()));
+    clients.emplace(cl->id(), std::make_shared<client_peer>(cl));
     const std::shared_ptr<operation> &op = history->fetch(last_known_state);
 
-    return std::make_tuple(client_id, op, history->last_state());
+    return std::make_pair(op, history->last_state());
+}
+
+void server::disconnect(const int &client_id) {
+    const auto &cl = clients.find(client_id);
+
+    assert(cl != clients.end());
+    const auto &cl_peer = cl->second;
+    while (cl_peer->get_pending_queue_size()) cl_peer->proceed_one_task();
+
+    clients.erase(client_id);
 }
 
 void server::on_receive(const int &from_client_id, const std::shared_ptr<operation> &op, const int &parent_state) {
@@ -41,15 +48,16 @@ void server::on_receive(const int &from_client_id, const std::shared_ptr<operati
         history->push(appl);
     }
 
-    for (auto i = 0; i < clients.size(); i++) {
-        if (i == from_client_id - 1) {
-            clients[i]->send_ack(appl, history->last_state());
+    for (const auto &[cl_id, cl] : clients) {
+        if (cl_id == from_client_id) {
+            cl->send_ack(appl, history->last_state());
         } else {
-            clients[i]->send_update(appl, history->last_state());
+            cl->send_update(appl, history->last_state());
         }
     }
 }
 
-std::shared_ptr<client_peer> server::get_peer(const int &client_id) {
-    return clients.at(client_id - 1);
+std::shared_ptr<client_peer> server::get_peer(const int &client_id) const {
+    auto cl = clients.find(client_id);
+    return cl == clients.end() ? nullptr : cl->second;
 }

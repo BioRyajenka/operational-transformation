@@ -22,9 +22,14 @@ static const int TYPE_UPDATE = 2;
 template<typename T>
 void run_in_one_thread(
         const int &initial_document_size,
-        const int &clients_num, const double &producing_action_weight, const int &simulation_time
+        const int &clients_num,
+        const double &producing_action_weight,
+        const int &simulation_time,
+        const int &first_client_connection_time
 ) {
+    assert(clients_num > 0);
     assert(producing_action_weight > 0. && producing_action_weight < 1.);
+    assert(first_client_connection_time < simulation_time);
     if (clients_num >> 11) {
         printf("Max allowed clients is %d! Increase limit in symbol.cpp\n", clients_num);
         exit(-1);
@@ -39,19 +44,23 @@ void run_in_one_thread(
     for (int i = 0; i < clients_num; i++) {
         auto ml = std::make_shared<magic_list<node_id_t>>();
         ml->insert(symbol::initial.id);
-        auto *cl = new client(serv_peer, [ml](const operation &op) {
+        auto *cl = new client(i + 1, [ml](const operation &op) {
             for (const auto &[node_id, ch] : *op.get_insertions()) {
                 ch.iterate([ml](const auto &s) { ml->insert(s.id); });
             }
             for (const auto &[node_id, _] : *op.get_deletions()) {
                 ml->remove(node_id);
             }
-
         });
         clients[i] = std::make_pair(cl, ml);
-
-        printf("Client %d created\n", i);
     }
+
+    for (int i = 0; i < clients_num; i++) {
+        clients[i].first->connect(serv_peer);
+        printf("Client %d connected\n", clients[i].first->id());
+    }
+    clients[0].first->disconnect();
+    printf("Client %d disconnected\n", clients[0].first->id());
 
     ll operations_produced = 0;
 
@@ -62,15 +71,28 @@ void run_in_one_thread(
 
     printf("Initialization done. Starting simulation\n");
 
-    std::chrono::steady_clock::time_point simulation_started = std::chrono::steady_clock::now();
+    const auto &simulation_started = std::chrono::steady_clock::now();
     while (true) {
-        std::chrono::steady_clock::time_point current_time = std::chrono::steady_clock::now();
-        const int seconds_elapsed = std::chrono::duration_cast<std::chrono::seconds>(
-                current_time - simulation_started).count();
+        const auto &current_time = std::chrono::steady_clock::now();
+        const int &seconds_elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+                current_time - simulation_started
+        ).count();
         if (seconds_elapsed > simulation_time) break;
+        if (seconds_elapsed > first_client_connection_time && !serv->get_peer(clients[0].first->id())) {
+            printf("Reconnecting client %d with %lld operations missed!\n", clients[0].first->id(), operations_produced);
+            clients[0].first->connect(serv_peer);
+            const auto &time_after_connection = std::chrono::steady_clock::now();
+            const int &connection_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    time_after_connection - current_time
+            ).count();
+            printf("Connection took %.3lf seconds\n", (double) connection_time / 1000);
+        }
 
         int events_to_consume = serv_peer->get_pending_queue_size();
-        for (const auto &cl : clients) events_to_consume += serv->get_peer(cl.first->id())->get_pending_queue_size();
+        for (const auto &cl : clients) {
+            const auto &cl_peer = serv->get_peer(cl.first->id());
+            if (cl_peer) events_to_consume += cl_peer->get_pending_queue_size();
+        }
 
         double dice_result = dice(rand_engine) * (producing_action_weight * clients_num + events_to_consume);
         if (dice_result < producing_action_weight * clients_num) {
@@ -95,9 +117,12 @@ void run_in_one_thread(
             bool client_processed = false;
             int roulette_result = (int) (dice(rand_engine) * events_to_consume);
             for (const auto &cl : clients) {
-                roulette_result -= serv->get_peer(cl.first->id())->get_pending_queue_size();
-                if (serv->get_peer(cl.first->id())->get_pending_queue_size() && roulette_result <= 0) {
-                    serv->get_peer(cl.first->id())->proceed_one_task();
+                const auto &cl_peer = serv->get_peer(cl.first->id());
+                if (!cl_peer) continue;
+
+                roulette_result -= cl_peer->get_pending_queue_size();
+                if (cl_peer->get_pending_queue_size() && roulette_result <= 0) {
+                    cl_peer->proceed_one_task();
                     client_processed = true;
                     break;
                 }
@@ -122,8 +147,10 @@ void run_in_one_thread(
             modified = true;
         }
         for (const auto &cl : clients) {
-            while (serv->get_peer(cl.first->id())->get_pending_queue_size()) {
-                serv->get_peer(cl.first->id())->proceed_one_task();
+            const auto &cl_peer = serv->get_peer(cl.first->id());
+            if (!cl_peer) continue;
+            while (cl_peer->get_pending_queue_size()) {
+                cl_peer->proceed_one_task();
                 modified = true;
             }
         }
@@ -147,13 +174,14 @@ void run_in_one_thread(
     for (const auto &cl : clients) delete cl.first;
 
     // === ===
-    printf("Each client produced %.3lf ops/sec at average\n", 1.0 * operations_produced / simulation_time /  20);
-    printf("Final synchronization took %.8lf seconds\n", (double) (finalization_finished - finalization_started) / CLOCKS_PER_SEC);
+    printf("Each client produced %.3lf ops/sec at average\n", 1.0 * operations_produced / simulation_time / 20);
+    printf("Final synchronization took %.8lf seconds\n",
+           (double) (finalization_finished - finalization_started) / CLOCKS_PER_SEC);
 }
 
 int main() {
-    run_in_one_thread<simple_history>(1000, 20, .99f, 10);
-//    run_in_one_thread<jumping_history>(1000, 20, .99f, 10);
+//    run_in_one_thread<simple_history>(100000, 20, .99f, 10, 5);
+    run_in_one_thread<jumping_history>(100000, 20, .99f, 10, 5);
     /**
      * With simple_history:
      *

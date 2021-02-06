@@ -16,10 +16,10 @@ private:
     enum task_type { ACK, RECEIVE };
     typedef std::tuple<task_type, std::shared_ptr<operation>, int> client_peer_task;
 
-    client *cl;
     blocking_queue<client_peer_task> queue;
-
 public:
+
+    client *cl;
     explicit client_peer(client *cl);
     client_peer(const client_peer &) = delete;
     client_peer(client_peer &&) = delete;
@@ -32,6 +32,7 @@ public:
     void proceed_one_task();
 
     int get_pending_queue_size() const;
+
 };
 
 

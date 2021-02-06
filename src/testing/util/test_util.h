@@ -29,6 +29,8 @@ std::enable_if_t<std::is_integral_v<T>> print_vector(const std::vector<T> vec) {
 
 void print_doc(const std::string& prefix, const document &doc);
 
+std::vector<node_id_t> chain2vec(const chain &ch);
+
 void print_chain(const std::string& prefix, const chain &ch);
 
 void print_operation(const std::string &prefix, const operation &op);

@@ -5,10 +5,6 @@
 #include <unordered_set>
 #include <cassert>
 #include "operation.h"
-#include "../client/document.h"
-#include "../testing/util/test_util.h"
-
-// TODO: проверить что во всех циклах не важно в каком порядке иду
 
 void merge_chains(
         const node_id_t &source_node_id,
@@ -95,7 +91,7 @@ void process_deletions(
         const auto &rhs_del_node = rhs.get_deletions()->find(node_id);
         if (rhs_del_node != rhs.get_deletions()->end()) {
             // TODO: do we need this check?
-//            assert(rhs_del_node->second == parent_id);
+            assert(rhs_del_node->second == parent_id);
         } else {
             const auto &rhs_ins = rhs.get_insertions()->find(parent_id);
 
@@ -149,12 +145,6 @@ void validate_insertion_starting_nodes_unique(const operation &a, const operatio
  *
  * maybe this invariant can be weaken to reduce deep-copying and improve performance
  */
-
-// TODO: единственные места, где я могу поменять операции - это insertions
-//  (сейчас в этом файле это все места с .insert(...))
-//  сейчас конструктор новой операции не копирует цепь, но сама apply копирует
-//  вдруг я могу не копирововать даже в apply? могу, если та цепь, что в
-//  конструкторе, никогда не меняется и не используется (не читается)
 std::pair<std::shared_ptr<operation>, std::shared_ptr<operation>> operation::transform(
         const operation &rhs,
         const bool &only_right_part
@@ -196,11 +186,6 @@ std::pair<std::shared_ptr<operation>, std::shared_ptr<operation>> operation::tra
     // === process deletions ===
     if (!only_right_part) process_deletions(rhs.deletions, *this, left);
     process_deletions(deletions, rhs, right);
-
-//    print_operation("a", *this);
-//    print_operation("b", rhs);
-//    if (!only_right_part)print_operation("left", *left);
-//    print_operation("right", *right);
 
     return std::make_pair(left, right);
 }

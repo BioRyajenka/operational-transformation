@@ -19,7 +19,7 @@ Maximum operations throughput for each client doesn't depend on the document siz
 
 For 20 clients and server, all running on my laptop (AMD Ryzen 9 4900HS 3.00 GHz), it is about
 `832.140 ops/sec` on average. For 2000 clients and server, it is about `8.610 ops/sec`. 
-Note that this measurements are given for "simple" history engine (see below). 
+Note that these measurements are given for "simple" history engine (see below). 
 
 ### memory consumption ###
 Server needs 24 byte for each symbol: 4 byte for id, 4 byte for value and 16 bytes for
@@ -32,7 +32,7 @@ will be around `~640mb` for 10^7-sized document.
 Note that during simulation many additional data need to be stored for each client. 
 Additional structure ("magic_list.h" in code) is needed to generate random positions in document.
 This structure will also take about 24 bytes for each symbol, so, during simulation it will also
-require additional `~240mb` for each client.  
+require additional `~240mb` for each client.
 
 History engines
 ----
@@ -43,7 +43,21 @@ They have the following characteristics:
   client from his last sync with server)
 * on the other hand, *jumping* history engine is slower on operations addition (**O(nlogn)** time), 
 but it is much faster on retrieving operations from history: **O(logn)** time for retrieval.
-  
+
+### yet another metric (reconnection after working offline for a long time) ###
+Consider the following scenario: 19 clients making about 60 ops/sec into 10^5-sized document.
+Then one new client connects. 
+
+To connect, he need to download all changes which were made after 
+him being online for the last time. All missed operations produced by other clients need to be
+combined into a new one and be sent to the new client.
+
+With *simple* history engine, all missed operations will be combined one-by-one (**O(n)** complexity). 
+With *jumping* history engine, only **O(logn)** combinations is needed.
+
+Given the scenario described, if the new client reconnects after 5 seconds offline with 
+~6000 missed operations, with a *simple* history mechanism, the server will need about `~14 seconds`
+to reconnect this client. Whereas with a *jumping* history engine, the server will need only `~0.007 seconds`.
 
 How to run the code
 ----

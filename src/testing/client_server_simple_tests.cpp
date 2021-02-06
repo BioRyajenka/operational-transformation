@@ -141,9 +141,4 @@ TEST_CASE("client-server simple scenarios") {
         CHECK(check_doc_ids(*cl1->server_doc, {0, 6, 4, 5, 3}));
         CHECK(check_doc_ids(*cl2->server_doc, {0, 6, 4, 5, 3}));
     }
-
-    // TODO: еще можно стресстест на operational_transform:
-    //  в одну доку пихать по паре рандомных операций и проверять
-    //  что их трансформации сходятся
-    //  и лучше не рандомных, а все варианты перебрать
 }

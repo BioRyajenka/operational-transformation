@@ -60,7 +60,9 @@ std::vector<node_id_t> chain2vec(const chain &ch) {
 
 void print_chain(const std::string& prefix, const chain &ch) {
     printf("%s: ", prefix.c_str());
-    print_vector(chain2vec(ch));
+    const std::vector<node_id_t> &v = chain2vec(ch);
+    printf("%u", v[0]);
+    for (int j = 1; j < (int) v.size(); j++) printf("->%u", v[j]);
 }
 
 bool check_doc_ids(const document &doc, std::initializer_list<node_id_t> expected_list) {

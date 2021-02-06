@@ -15,10 +15,7 @@
 
 class client {
 public:
-    client(
-            const std::shared_ptr<server_peer> &peer,
-            const std::function<void(const operation &)> &operation_listener
-    );
+    client(const int &client_id, std::function<void(const operation &)> operation_listener);
 
 private:
     int client_id;
@@ -44,6 +41,9 @@ public:
 
     // public for testing
     std::shared_ptr<document> server_doc;
+
+    void connect(const std::shared_ptr<server_peer> &peer);
+    void disconnect();
 
     void apply_user_op(const std::shared_ptr<operation> &op);
 
