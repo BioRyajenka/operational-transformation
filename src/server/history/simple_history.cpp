@@ -2,7 +2,6 @@
 // Created by Igor on 06.02.2021.
 //
 
-#include <ctime>
 #include "simple_history.h"
 
 
@@ -38,16 +37,8 @@ std::shared_ptr<operation> simple_history::fetch(const int &from) const {
     assert(from >= 0 && from <= stack.size());
     std::shared_ptr<operation> op = std::make_shared<operation>();
 
-    clock_t begin = clock();
-
     for (int i = from; i < stack.size(); i++) {
         op->apply(*stack[i]);
-    }
-
-    if (from == 1 && stack.size() > 100) {
-        clock_t end = clock();
-        double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-        printf("reconnection time: %.3lf\n", elapsed_secs);
     }
 
     return op;

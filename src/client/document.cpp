@@ -54,27 +54,3 @@ node<symbol> const *document::get_node(const node_id_t &node_id) const {
     const auto &it = map.find(node_id);
     return it == map.end() ? nullptr : it->second;
 }
-
-void document::undo_insertions(const std::unordered_map<node_id_t, chain> &insertions) {
-    for (const auto &[node_id, ch] : insertions) {
-        auto &before = map.at(node_id);
-        auto &cur = before->next;
-        auto c = ch.get_head();
-
-        while (c != nullptr) {
-            assert(cur->value.id == c->value.id && cur->value.value == c->value.value);
-            const auto tmp = cur;
-            cur = cur->next;
-            c = c->next;
-
-            content_hash ^= tmp->value.id * tmp->value.value;
-            map.erase(tmp->value.id);
-            data.remove_node(tmp);
-        }
-    }
-}
-
-ll document::hash() const {
-    return content_hash;
-}
-

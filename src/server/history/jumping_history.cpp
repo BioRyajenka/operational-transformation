@@ -2,7 +2,6 @@
 // Created by Igor on 05.02.2021.
 //
 
-#include <ctime>
 #include "jumping_history.h"
 
 void jumping_history::push(const std::shared_ptr<operation> &new_op) {
@@ -26,20 +25,12 @@ std::shared_ptr<operation> jumping_history::fetch(const int &from) const {
     int mask = (int)stack.size() - from;
     int cur = from;
 
-    clock_t begin = clock();
-
     auto op = std::make_shared<operation>();
     for (int i = 0; (1 << i) <= mask; i++) {
         if (mask & (1 << i)) {
             cur += 1 << i;
             op->apply(*stack[cur - 1][i]);
         }
-    }
-
-    if (from == 1 && stack.size() > 100) {
-        clock_t end = clock();
-        double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-        printf("reconnection time: %.3lf\n", elapsed_secs);
     }
 
     return op;

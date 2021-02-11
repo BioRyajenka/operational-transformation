@@ -15,11 +15,11 @@ private:
 public:
     ~jumping_history() override = default;
 
-    void push(const std::shared_ptr<operation> &new_op);
+    void push(const std::shared_ptr<operation> &new_op) override;
 
-    [[nodiscard]] std::shared_ptr<operation> fetch(const int &from) const;
+    [[nodiscard]] std::shared_ptr<operation> fetch(const int &from) const override;
 
-    [[nodiscard]] int last_state() const;
+    [[nodiscard]] int last_state() const override;
 };
 
 #endif //OT_VARIATION_JUMPING_HISTORY_H

@@ -28,7 +28,7 @@ void run_in_one_thread(
         const int &first_client_connection_time
 ) {
     assert(clients_num > 0);
-    assert(producing_action_weight > 0. && producing_action_weight < 1.);
+    assert(producing_action_weight > 0. && producing_action_weight <= 1.);
     assert(first_client_connection_time < simulation_time);
     if (clients_num >> 11) {
         printf("Max allowed clients is %d! Increase limit in symbol.cpp\n", clients_num);
@@ -180,7 +180,7 @@ void run_in_one_thread(
 }
 
 int main() {
-//    run_in_one_thread<simple_history>(100000, 20, .99f, 10, 5);
+//    run_in_one_thread<simple_history>(100000, 20, 1., 10, 5);
     run_in_one_thread<jumping_history>(100000, 20, .99f, 10, 5);
     /**
      * With simple_history:

@@ -82,14 +82,6 @@ public:
         }
     }
 
-//    void iterate_nodes(const std::function<void(node<symbol> *)> &consumer) const {
-//        auto cur = head;
-//        while (cur != nullptr) {
-//            consumer(cur);
-//            cur = cur->next;
-//        }
-//    }
-
     std::pair<node<symbol>*, node<symbol>*> copy_to(node<symbol> *target, const chain &rhs) {
         return move_to(target, rhs.copy());
     }
