@@ -11,7 +11,7 @@
 #include "../../client/document.h"
 #include <initializer_list>
 
-symbol create_symbol(const node_id_t &id, const int &val);
+symbol create_symbol(node_id_t id, int val);
 
 chain create_chain(std::initializer_list<node_id_t> ids);
 
@@ -23,7 +23,7 @@ bool check_doc_ids(const document &doc, std::initializer_list<node_id_t> expecte
 
 template<typename T>
 std::enable_if_t<std::is_integral_v<T>> print_vector(const std::vector<T> vec) {
-    for (const auto &i : vec) printf("%d ", i);
+    for (const auto i : vec) printf("%d ", i);
     printf("\n");
 }
 

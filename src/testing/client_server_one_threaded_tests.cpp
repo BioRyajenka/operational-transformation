@@ -20,11 +20,11 @@ static const int TYPE_UPDATE = 2;
 
 template<typename T>
 void run_in_one_thread(
-        const int &initial_document_size,
-        const int &clients_num,
-        const double &producing_action_weight,
-        const int &simulation_time,
-        const int &first_client_connection_time
+        const int initial_document_size,
+        const int clients_num,
+        const double producing_action_weight,
+        const int simulation_time,
+        const int first_client_connection_time
 ) {
     assert(clients_num > 0);
     assert(producing_action_weight > 0. && producing_action_weight <= 1.);
@@ -50,10 +50,10 @@ void run_in_one_thread(
 
         ml.insert(symbol::initial.id);
         cl.set_operation_listener([&ml](const operation &op) {
-            for (const auto &[node_id, ch] : *op.get_insertions()) {
-                ch.iterate([&ml](const auto &s) { ml.insert(s.id); });
+            for (const auto &[node_id, ch] : op.get_insertions()) {
+                ch.iterate([&ml](const auto s) { ml.insert(s.id); });
             }
-            for (const auto &[node_id, _] : *op.get_deletions()) {
+            for (const auto [node_id, _] : op.get_deletions()) {
                 ml.remove(node_id);
             }
         });
@@ -78,7 +78,7 @@ void run_in_one_thread(
     const auto &simulation_started = std::chrono::steady_clock::now();
     while (true) {
         const auto &current_time = std::chrono::steady_clock::now();
-        const int &seconds_elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+        const int seconds_elapsed = std::chrono::duration_cast<std::chrono::seconds>(
                 current_time - simulation_started
         ).count();
         if (seconds_elapsed > simulation_time) break;
@@ -86,7 +86,7 @@ void run_in_one_thread(
             printf("Reconnecting client %d with %lld operations missed!\n", clients[0].first.id(), operations_produced);
             clients[0].first.connect(serv_peer);
             const auto &time_after_connection = std::chrono::steady_clock::now();
-            const int &connection_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+            const int connection_time = std::chrono::duration_cast<std::chrono::milliseconds>(
                     time_after_connection - current_time
             ).count();
             printf("Connection took %.3lf seconds\n", (double) connection_time / 1000);

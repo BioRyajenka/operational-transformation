@@ -15,7 +15,7 @@
 
 class client {
 public:
-    client(const int &client_id);
+    client(int client_id);
 
 private:
     int client_id;
@@ -34,9 +34,9 @@ private:
     std::function<void(const operation &)> operation_listener;
 
 private:
-    void send_to_server(const std::shared_ptr<operation> &op, const int &parent_state);
+    void send_to_server(const std::shared_ptr<operation> &op, int parent_state);
 
-    symbol generate_symbol(const int &value) const;
+    symbol generate_symbol(int value) const;
 
 public:
     // public for testing
@@ -48,13 +48,13 @@ public:
 
     void apply_user_op(std::unique_ptr<operation> &op);
 
-    void do_insert(const node_id_t &node_id, const int value);
-    void do_update(const node_id_t &node_id, const int new_value);
-    void do_delete(const node_id_t &node_id);
+    void do_insert(node_id_t node_id, const int value);
+    void do_update(node_id_t node_id, const int new_value);
+    void do_delete(node_id_t node_id);
 
-    void on_ack(const operation &op, const int &new_server_state);
+    void on_ack(const operation &op, int new_server_state);
 
-    void on_receive(const operation &op, const int &new_server_state);
+    void on_receive(const operation &op, int new_server_state);
 
     int id() const;
 

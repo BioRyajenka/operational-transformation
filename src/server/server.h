@@ -20,15 +20,15 @@ private:
     std::unique_ptr<operations_history> _history;
 
 public:
-    server(const int &initial_doc_size, std::unique_ptr<operations_history> &&history);
+    server(int initial_doc_size, std::unique_ptr<operations_history> &&history);
 
-    std::pair<std::unique_ptr<operation>, int> connect(client* cl, const int &last_known_state);
+    std::pair<std::unique_ptr<operation>, int> connect(client* cl, int last_known_state);
 
-    void disconnect(const int &client_id);
+    void disconnect(int client_id);
 
-    void on_receive(const int &from_client_id, const std::shared_ptr<operation> &op, const int &parent_state);
+    void on_receive(int from_client_id, const std::shared_ptr<operation> &op, int parent_state);
 
-    std::shared_ptr<client_peer> get_peer(const int &client_id) const;
+    std::shared_ptr<client_peer> get_peer(int client_id) const;
 };
 
 

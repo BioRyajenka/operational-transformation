@@ -24,12 +24,12 @@ private:
 public:
     server_peer(std::shared_ptr<server> serv);
 
-    std::pair<std::unique_ptr<operation>, int> connect(client *client, const int &last_known_state);
+    std::pair<std::unique_ptr<operation>, int> connect(client *client, int last_known_state);
 
-    void disconnect(const int &client_id);
+    void disconnect(int client_id);
 
     // operation will be copied
-    void send(const int& client_id, const std::shared_ptr<operation> &op, const int &parent_state);
+    void send(int client_id, const std::shared_ptr<operation> &op, int parent_state);
 
     // blocking method
     void proceed_one_task();

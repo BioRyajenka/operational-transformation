@@ -7,11 +7,11 @@
 
 client_peer::client_peer(client *cl) : cl(cl) {}
 
-void client_peer::send_ack(const std::shared_ptr<operation> &op, const int &new_server_state) {
+void client_peer::send_ack(const std::shared_ptr<operation> &op, const int new_server_state) {
     queue.push(std::make_tuple(task_type::ACK, op, new_server_state));
 }
 
-void client_peer::send_update(const std::shared_ptr<operation> &op, const int &new_server_state) {
+void client_peer::send_update(const std::shared_ptr<operation> &op, const int new_server_state) {
     queue.push(std::make_tuple(task_type::RECEIVE, op, new_server_state));
 }
 

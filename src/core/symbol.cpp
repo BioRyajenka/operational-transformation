@@ -5,9 +5,9 @@
 #include <stdexcept>
 #include "symbol.h"
 
-symbol::symbol(const node_id_t &id, const int &value) : id(id), value(value) {}
+symbol::symbol(const node_id_t id, const int value) : id(id), value(value) {}
 
-symbol::symbol(const int &client_id, const int &node_id, const int &value) : value(value) {
+symbol::symbol(const int client_id, const int node_id, const int value) : value(value) {
 //    assert(client_id > 0);
     if (node_id >> 21) throw std::runtime_error("Id num is too large");
     if (client_id >> 11) throw std::runtime_error("Client id is too large");

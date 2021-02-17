@@ -24,9 +24,9 @@ public:
     client_peer(const client_peer &) = delete;
     client_peer(client_peer &&) = delete;
 
-    void send_ack(const std::shared_ptr<operation> &op, const int &new_server_state);
+    void send_ack(const std::shared_ptr<operation> &op, int new_server_state);
 
-    void send_update(const std::shared_ptr<operation> &op, const int &new_server_state);
+    void send_update(const std::shared_ptr<operation> &op, int new_server_state);
 
     // blocking method
     void proceed_one_task();

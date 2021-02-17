@@ -13,7 +13,7 @@ void simple_history::push(const std::shared_ptr<operation> &op) {
     stack.push_back(op);
 }
 
-std::unique_ptr<operation> simple_history::fetch(const int &from) const {
+std::unique_ptr<operation> simple_history::fetch(const int from) const {
     assert(from >= 0 && from <= stack.size());
     auto op = std::make_unique<operation>();
 

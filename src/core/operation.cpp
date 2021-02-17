@@ -9,19 +9,19 @@ static const int HASH_FLAG_UPDATE = -472705117;
 static const int HASH_FLAG_DELETE = 3552447;
 
 void operation::apply(const operation &rhs) {
-    for (const auto &[node_id, parent_id] : rhs.deletions) del(node_id, parent_id);
-    for (const auto &[node_id, new_value] : rhs.updates) update(node_id, new_value);
+    for (const auto [node_id, parent_id] : rhs.deletions) del(node_id, parent_id);
+    for (const auto [node_id, new_value] : rhs.updates) update(node_id, new_value);
     for (const auto &[node_id, ch] : rhs.insertions) insert(node_id, ch);
 }
 
-void operation::insert(const node_id_t &node_id, const chain &chain_to_copy) {
+void operation::insert(const node_id_t node_id, const chain &chain_to_copy) {
     assert(!deletions.count(node_id) && "Deleted nodes can't be inserted to");
 
-    chain_to_copy.iterate([this](const auto &s){
+    chain_to_copy.iterate([this](const auto s){
         content_hash ^= s.id * s.value;
     });
 
-    const auto &existing_chain = insertions.find(node_id);
+    const auto existing_chain = insertions.find(node_id);
     if (existing_chain != insertions.end()) {
         existing_chain->second.copy_to_the_beginning(chain_to_copy);
     } else {
@@ -41,7 +41,7 @@ void operation::insert(const node_id_t &node_id, const chain &chain_to_copy) {
     }
 }
 
-void operation::update(const node_id_t &node_id, const int &new_value) {
+void operation::update(const node_id_t node_id, const int new_value) {
     assert(!deletions.count(node_id) && "Deleted nodes can't be updated");
 
     auto prev = updates.find(node_id);
@@ -53,7 +53,7 @@ void operation::update(const node_id_t &node_id, const int &new_value) {
     updates.emplace(node_id, new_value).first->second = new_value;
 }
 
-void operation::del(const node_id_t &node_id, node_id_t parent_id) {
+void operation::del(const node_id_t node_id, node_id_t parent_id) {
     assert(!deletions.count(node_id));
 
     if (updates.count(node_id)) {
@@ -65,7 +65,7 @@ void operation::del(const node_id_t &node_id, node_id_t parent_id) {
         for (auto &[n_id, ch] : insertions) {
             // note: here is bottleneck. one can use hashmap in chain
             // to speedup node lookup, but it will require more memory
-            const auto &n = ch.find_node(node_id);
+            const auto n = ch.find_node(node_id);
             if (n) {
                 content_hash ^= node_id * n->value.value;
 
@@ -105,12 +105,12 @@ void operation::del(const node_id_t &node_id, node_id_t parent_id) {
     }
 }
 
-void operation::rehang_insertions(const node_id_t &from_node_id, const node_id_t &to_node_id) {
+void operation::rehang_insertions(const node_id_t from_node_id, const node_id_t to_node_id) {
     assert(insertions.count(from_node_id));
     assert(!deletions.count(to_node_id));
 
     chain &source_chain = insertions.at(from_node_id);
-    const auto &target_chain = insertions.find(to_node_id);
+    const auto target_chain = insertions.find(to_node_id);
     if (target_chain != insertions.end()) {
         // chain already exists
         target_chain->second.move_to_the_end(std::move(source_chain));

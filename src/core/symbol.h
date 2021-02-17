@@ -10,7 +10,7 @@
 
 class symbol {
 private:
-    symbol(const node_id_t &id, const int &value);
+    symbol(node_id_t id, int value);
 
 public:
     // 16 bit - номер юзера, 48 bit - сам айди
@@ -18,7 +18,7 @@ public:
     node_id_t id;
     int value;
 
-    symbol(const int &client_id, const int &node_id, const int &value);
+    symbol(int client_id, int node_id, int value);
 
     static symbol initial;
 };
