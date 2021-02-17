@@ -20,12 +20,12 @@ void jumping_history::push(const std::shared_ptr<operation> &new_op) {
     }
 }
 
-std::shared_ptr<operation> jumping_history::fetch(const int &from) const {
+std::unique_ptr<operation> jumping_history::fetch(const int &from) const {
     // from "from" to "stack.size() - 1"
     int mask = (int)stack.size() - from;
     int cur = from;
 
-    auto op = std::make_shared<operation>();
+    auto op = std::make_unique<operation>();
     for (int i = 0; (1 << i) <= mask; i++) {
         if (mask & (1 << i)) {
             cur += 1 << i;

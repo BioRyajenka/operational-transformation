@@ -22,7 +22,6 @@ void document::apply(const operation &op) {
     for (const auto &[node_id, _] : *op.get_deletions()) {
         const node<symbol> *n = map.at(node_id);
 
-        content_hash ^= n->value.id * n->value.value;
         data.remove_node(n);
         map.erase(node_id);
     }
@@ -33,7 +32,6 @@ void document::apply(const operation &op) {
 
         auto cur = head;
         while (cur != tail->next) {
-            content_hash ^= cur->value.id * cur->value.value;
             map[cur->value.id] = cur;
 
             cur = cur->next;
@@ -44,8 +42,6 @@ void document::apply(const operation &op) {
     for (const auto&[node_id, new_value] : *op.get_updates()) {
         node<symbol> *n = map.at(node_id);
 
-        content_hash ^= node_id * n->value.value; // remove
-        content_hash ^= node_id * new_value; // and reinsert
         n->value.value = new_value;
     }
 }

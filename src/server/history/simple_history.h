@@ -19,7 +19,7 @@ public:
 
     void push(const std::shared_ptr<operation> &op) override;
 
-    [[nodiscard]] std::shared_ptr<operation> fetch(const int &from) const override;
+    [[nodiscard]] std::unique_ptr<operation> fetch(int from) const override;
 
     [[nodiscard]] int last_state() const override;
 };

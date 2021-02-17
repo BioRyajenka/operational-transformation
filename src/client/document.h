@@ -13,9 +13,6 @@ class document {
     chain data;
     std::unordered_map<node_id_t, node<symbol>*> map;
 
-    // hash will track only node ids and their values (ignoring order)
-    ll content_hash = 0;
-
 public:
     document() : data(symbol::initial) {
         map[symbol::initial.id] = data.get_head();

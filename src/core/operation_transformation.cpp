@@ -10,8 +10,8 @@ void merge_chains(
         const node_id_t &source_node_id,
         const chain &a, // both are not empty
         const chain &b,
-        const std::shared_ptr<operation> &left,
-        const std::shared_ptr<operation> &right
+        const std::unique_ptr<operation> &left,
+        const std::unique_ptr<operation> &right
 ) {
     if (a.get_head()->value.id > b.get_head()->value.id) {
         // a should come first
@@ -32,7 +32,7 @@ void merge_chains(
 void process_deleted_insertions(
         const std::unordered_map<node_id_t, chain> &insertions,
         const operation &rhs,
-        const std::shared_ptr<operation> &target
+        operation &target
 ) {
     for (const auto&[node_id, ch]: insertions) {
         const auto &rhs_del = rhs.get_deletions()->find(node_id);
@@ -49,7 +49,7 @@ void process_deleted_insertions(
                 new_root = del_parent;
             }
 
-            target->insert(new_root, ch);
+            target.insert(new_root, ch);
         }
     }
 }
@@ -57,11 +57,11 @@ void process_deleted_insertions(
 void process_unique_insertions(
         const std::unordered_map<node_id_t, chain> &insertions,
         const operation &rhs,
-        const std::shared_ptr<operation> &target
+        operation &target
 ) {
     for (const auto&[node_id, ch]: insertions) {
         if (!rhs.get_deletions()->count(node_id) && !rhs.get_insertions()->count(node_id)) {
-            target->insert(node_id, ch);
+            target.insert(node_id, ch);
         }
     }
 }
@@ -69,14 +69,12 @@ void process_unique_insertions(
 void process_common_insertions(
         const std::unordered_map<node_id_t, chain> &insertions,
         const operation &rhs,
-        const std::shared_ptr<operation> &left,
-        const std::shared_ptr<operation> &right
+        const std::unique_ptr<operation> &left,
+        const std::unique_ptr<operation> &right
 ) {
     for (const auto&[node_id, ch]: insertions) {
         const auto &rhs_insertion = rhs.get_insertions()->find(node_id);
         if (rhs_insertion != rhs.get_insertions()->end()) {
-            assert(!rhs.get_deletions()->count(node_id)); // TODO: too obvious assert. can be deleted
-
             merge_chains(node_id, ch, rhs_insertion->second, left, right);
         }
     }
@@ -85,25 +83,24 @@ void process_common_insertions(
 void process_deletions(
         const std::unordered_map<node_id_t, node_id_t> &deletions,
         const operation &rhs,
-        const std::shared_ptr<operation> &target
+        operation &target
 ) {
     for (const auto &[node_id, parent_id] : deletions) {
         const auto &rhs_del_node = rhs.get_deletions()->find(node_id);
         if (rhs_del_node != rhs.get_deletions()->end()) {
-            // TODO: do we need this check?
             assert(rhs_del_node->second == parent_id);
         } else {
             const auto &rhs_ins = rhs.get_insertions()->find(parent_id);
 
             if (rhs_ins != rhs.get_insertions()->end()) {
                 const node_id_t &new_parent = rhs_ins->second.get_tail()->value.id;
-                target->del(node_id, new_parent);
+                target.del(node_id, new_parent);
             } else {
                 const auto &rhs_del_parent = rhs.get_deletions()->find(parent_id);
                 if (rhs_del_parent != rhs.get_deletions()->end()) {
-                    target->del(node_id, rhs_del_parent->second);
+                    target.del(node_id, rhs_del_parent->second);
                 } else {
-                    target->del(node_id, parent_id);
+                    target.del(node_id, parent_id);
                 }
             }
         }
@@ -113,14 +110,14 @@ void process_deletions(
 void process_updates(
         const std::unordered_map<node_id_t, int> &updates,
         const operation &rhs,
-        const std::shared_ptr<operation> &target
+        operation &target
 ) {
     for (const auto &[node_id, new_value] : updates) {
         if (!rhs.get_deletions()->count(node_id)) {
             const auto &rhs_update = rhs.get_updates()->find(node_id);
             if (rhs_update == rhs.get_updates()->end() || new_value < rhs_update->second) {
                 // if there is no update in rhs or our new_value is less than in rhs
-                target->update(node_id, new_value);
+                target.update(node_id, new_value);
             }
         }
     }
@@ -140,17 +137,19 @@ void validate_insertion_starting_nodes_unique(const operation &a, const operatio
 }
 
 /**
+ * TODO: check statement below vvv
+ *
  * current invariant is that arguments can't be changed after invocation without affecting result
  * and result can be changed without affecting arguments
  *
  * maybe this invariant can be weaken to reduce deep-copying and improve performance
  */
-std::pair<std::shared_ptr<operation>, std::shared_ptr<operation>> operation::transform(
+std::pair<std::unique_ptr<operation>, std::unique_ptr<operation>> operation::transform(
         const operation &rhs,
         const bool &only_right_part
 ) const {
-    const auto left = only_right_part ? nullptr : std::make_shared<operation>();
-    const auto right = std::make_shared<operation>();
+    auto left = only_right_part ? nullptr : std::make_unique<operation>();
+    auto right = std::make_unique<operation>();
 
     // === validating ops (only for debug) ===
 
@@ -168,24 +167,24 @@ std::pair<std::shared_ptr<operation>, std::shared_ptr<operation>> operation::tra
     // === process insertions ===
 
     // deleted insertions first. it is important
-    if (!only_right_part) process_deleted_insertions(rhs.insertions, *this, left);
-    process_deleted_insertions(this->insertions, rhs, right);
+    if (!only_right_part) process_deleted_insertions(rhs.insertions, *this, *left);
+    process_deleted_insertions(this->insertions, rhs, *right);
 
     // unique insertions
-    if (!only_right_part) process_unique_insertions(rhs.insertions, *this, left);
-    process_unique_insertions(insertions, rhs, right);
+    if (!only_right_part) process_unique_insertions(rhs.insertions, *this, *left);
+    process_unique_insertions(insertions, rhs, *right);
 
     // common insertions
     // if only_right_part , then left = nullptr
     process_common_insertions(insertions, rhs, left, right);
 
     // === process updates ===
-    if (!only_right_part) process_updates(rhs.updates, *this, left);
-    process_updates(updates, rhs, right);
+    if (!only_right_part) process_updates(rhs.updates, *this, *left);
+    process_updates(updates, rhs, *right);
 
     // === process deletions ===
-    if (!only_right_part) process_deletions(rhs.deletions, *this, left);
-    process_deletions(deletions, rhs, right);
+    if (!only_right_part) process_deletions(rhs.deletions, *this, *left);
+    process_deletions(deletions, rhs, *right);
 
-    return std::make_pair(left, right);
+    return { std::move(left), std::move(right) };
 }

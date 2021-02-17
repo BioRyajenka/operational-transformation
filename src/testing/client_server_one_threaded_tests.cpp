@@ -6,7 +6,6 @@
 #include <vector>
 #include <chrono>
 #include <random>
-#include <string>
 #include <climits>
 #include "util/magic_list.h"
 #include "../server/server.h"
@@ -31,36 +30,41 @@ void run_in_one_thread(
     assert(producing_action_weight > 0. && producing_action_weight <= 1.);
     assert(first_client_connection_time < simulation_time);
     if (clients_num >> 11) {
-        printf("Max allowed clients is %d! Increase limit in symbol.cpp\n", clients_num);
+        printf("Max allowed clients number is %d! Increase limit in symbol.cpp\n", (1 << 11) - 1);
         exit(-1);
     }
 
     printf("Initializing...\n");
-    auto serv = std::make_shared<server>(initial_document_size, std::make_shared<T>());
+    std::shared_ptr<server> serv = std::make_shared<server>(initial_document_size, std::make_unique<T>());
     printf("Server created\n");
     auto serv_peer = std::make_shared<server_peer>(serv);
 
-    std::vector<std::pair<client *, std::shared_ptr<magic_list<node_id_t>>>> clients(clients_num);
+    std::vector<std::pair<client, magic_list<node_id_t>>> clients;
+    clients.reserve(clients_num);
     for (int i = 0; i < clients_num; i++) {
-        auto ml = std::make_shared<magic_list<node_id_t>>();
-        ml->insert(symbol::initial.id);
-        auto *cl = new client(i + 1, [ml](const operation &op) {
+        // emplace client and move magic_list
+        clients.emplace_back(i + 1, magic_list<node_id_t>());
+
+        auto &cl = clients[i].first;
+        auto &ml = clients[i].second;
+
+        ml.insert(symbol::initial.id);
+        cl.set_operation_listener([&ml](const operation &op) {
             for (const auto &[node_id, ch] : *op.get_insertions()) {
-                ch.iterate([ml](const auto &s) { ml->insert(s.id); });
+                ch.iterate([&ml](const auto &s) { ml.insert(s.id); });
             }
             for (const auto &[node_id, _] : *op.get_deletions()) {
-                ml->remove(node_id);
+                ml.remove(node_id);
             }
         });
-        clients[i] = std::make_pair(cl, ml);
     }
 
     for (int i = 0; i < clients_num; i++) {
-        clients[i].first->connect(serv_peer);
-        printf("Client %d connected\n", clients[i].first->id());
+        clients[i].first.connect(serv_peer);
+        printf("Client %d connected\n", clients[i].first.id());
     }
-    clients[0].first->disconnect();
-    printf("Client %d disconnected\n", clients[0].first->id());
+    clients[0].first.disconnect();
+    printf("Client %d disconnected\n", clients[0].first.id());
 
     ll operations_produced = 0;
 
@@ -78,9 +82,9 @@ void run_in_one_thread(
                 current_time - simulation_started
         ).count();
         if (seconds_elapsed > simulation_time) break;
-        if (seconds_elapsed > first_client_connection_time && !serv->get_peer(clients[0].first->id())) {
-            printf("Reconnecting client %d with %lld operations missed!\n", clients[0].first->id(), operations_produced);
-            clients[0].first->connect(serv_peer);
+        if (seconds_elapsed > first_client_connection_time && !serv->get_peer(clients[0].first.id())) {
+            printf("Reconnecting client %d with %lld operations missed!\n", clients[0].first.id(), operations_produced);
+            clients[0].first.connect(serv_peer);
             const auto &time_after_connection = std::chrono::steady_clock::now();
             const int &connection_time = std::chrono::duration_cast<std::chrono::milliseconds>(
                     time_after_connection - current_time
@@ -90,7 +94,7 @@ void run_in_one_thread(
 
         int events_to_consume = serv_peer->get_pending_queue_size();
         for (const auto &cl : clients) {
-            const auto &cl_peer = serv->get_peer(cl.first->id());
+            const auto &cl_peer = serv->get_peer(cl.first.id());
             if (cl_peer) events_to_consume += cl_peer->get_pending_queue_size();
         }
 
@@ -99,15 +103,15 @@ void run_in_one_thread(
             // producing action on one of the clients
 
             auto &[cl, ml] = clients[dice(rand_engine) * clients.size()];
-            node_id_t random_node_id = ml->get_random();
+            node_id_t random_node_id = ml.get_random();
             int op_type = random_node_id == symbol::initial.id ? TYPE_INSERT : operation_type_generator(rand_engine);
 
             if (op_type == TYPE_UPDATE) {
-                cl->do_update(random_node_id, value_generator(rand_engine));
+                cl.do_update(random_node_id, value_generator(rand_engine));
             } else if (op_type == TYPE_DELETE) {
-                cl->do_delete(random_node_id);
+                cl.do_delete(random_node_id);
             } else if (op_type == TYPE_INSERT) {
-                cl->do_insert(random_node_id, value_generator(rand_engine));
+                cl.do_insert(random_node_id, value_generator(rand_engine));
             }
 
             operations_produced++;
@@ -117,7 +121,7 @@ void run_in_one_thread(
             bool client_processed = false;
             int roulette_result = (int) (dice(rand_engine) * events_to_consume);
             for (const auto &cl : clients) {
-                const auto &cl_peer = serv->get_peer(cl.first->id());
+                const auto &cl_peer = serv->get_peer(cl.first.id());
                 if (!cl_peer) continue;
 
                 roulette_result -= cl_peer->get_pending_queue_size();
@@ -138,16 +142,13 @@ void run_in_one_thread(
     // === finalization ===
     clock_t finalization_started = clock();
     while (true) {
-//        printf("Server queue size: %d\n", serv_peer->get_pending_queue_size());
-//        fflush(stdout);
-
         bool modified = false;
         while (serv_peer->get_pending_queue_size()) {
             serv_peer->proceed_one_task();
             modified = true;
         }
         for (const auto &cl : clients) {
-            const auto &cl_peer = serv->get_peer(cl.first->id());
+            const auto &cl_peer = serv->get_peer(cl.first.id());
             if (!cl_peer) continue;
             while (cl_peer->get_pending_queue_size()) {
                 cl_peer->proceed_one_task();
@@ -160,18 +161,11 @@ void run_in_one_thread(
 
     // === validating docs ===
     printf("Validation...\n");
-//    ll gauge = clients[0].first->server_doc->hash();
-//    for (int i = 1; i < (int) clients.size(); i++) {
-//        assert(clients[i].first->server_doc->hash() == gauge);
-//    }
-    const auto &gauge = doc2vec(*clients[0].first->server_doc);
+    const auto &gauge = doc2vec(*clients[0].first.server_doc);
     for (int i = 1; i < clients_num; i++) {
-        assert(check_vectors_equal(gauge, doc2vec(*clients[i].first->server_doc)));
+        assert(check_vectors_equal(gauge, doc2vec(*clients[i].first.server_doc)));
     }
     printf("Validation done. Each doc size is %d\n", (int) gauge.size());
-
-    // === clean up ===
-    for (const auto &cl : clients) delete cl.first;
 
     // === ===
     printf("Each client produced %.3lf ops/sec at average\n", 1.0 * operations_produced / simulation_time / 20);

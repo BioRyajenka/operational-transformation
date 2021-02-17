@@ -8,7 +8,7 @@
 
 server_peer::server_peer(std::shared_ptr<server> serv) : serv(std::move(serv)) {}
 
-std::pair<std::shared_ptr<operation>, int> server_peer::connect(client *client, const int &last_known_state) {
+std::pair<std::unique_ptr<operation>, int> server_peer::connect(client *client, const int &last_known_state) {
     return serv->connect(client, last_known_state);
 }
 
@@ -16,12 +16,11 @@ void server_peer::disconnect(const int &client_id) {
     serv->disconnect(client_id);
 }
 
-void server_peer::send(const int& client_id, const operation &op, const int &parent_state) {
+void server_peer::send(const int& client_id, const std::shared_ptr<operation> &op, const int &parent_state) {
     if (parent_state == -1) {
         throw std::runtime_error("Forgot to load initial state!");
     }
-    std::shared_ptr<operation> copy = std::make_shared<operation>(op);
-    queue.push(std::make_tuple(client_id, copy, parent_state));
+    queue.push(std::make_tuple(client_id, op, parent_state));
 }
 
 void server_peer::proceed_one_task() {

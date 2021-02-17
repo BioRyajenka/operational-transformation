@@ -11,9 +11,8 @@
 int client::free_node_id = 0;
 
 client::client(
-        const int &client_id,
-        std::function<void(const operation &)> operation_listener
-) : operation_listener(std::move(operation_listener)) {
+        const int &client_id
+) : operation_listener([](const operation &) {}) {
     assert(client_id > 0 && "Client id should be positive!");
     this->client_id = client_id;
     server_doc = std::make_shared<document>();
@@ -50,27 +49,19 @@ void client::disconnect() {
     peer = nullptr;
 }
 
-void client::apply_user_op(const std::shared_ptr<operation> &op) {
+void client::apply_user_op(std::unique_ptr<operation> &op) {
     operation_listener(*op);//    doc->apply(*op);
 
-    if (!peer) { // not connected
-        if (buffer) {
-            buffer->apply(*op);
-        } else buffer = op;
-
-        return;
-    }
-
-    if (in_flight) {
+    if (in_flight || !peer) { // if something sended or not connected
         if (buffer) {
             buffer->apply(*op);
         } else {
-            buffer = op;
+            buffer = std::move(op);
         }
     } else {
         assert(!buffer && "Invariant is not satisfied! connected -> in_flight==null -> buffer==null");
-        in_flight = op;
-        send_to_server(*in_flight, last_known_server_state);
+        in_flight = std::move(op);
+        send_to_server(in_flight, last_known_server_state);
     }
 }
 
@@ -81,9 +72,8 @@ void client::on_ack(const operation &op, const int &new_server_state) {
     last_known_server_state = new_server_state;
 
     if (buffer) {
-        in_flight = buffer;
-        send_to_server(*in_flight, last_known_server_state);
-        buffer = nullptr;
+        in_flight = std::move(buffer);
+        send_to_server(in_flight, last_known_server_state);
     } else {
         in_flight = nullptr;
     }
@@ -94,14 +84,14 @@ void client::on_receive(const operation &op, const int &new_server_state) {
     validate_against_state(op, *server_doc);
 
     if (in_flight) {
-        const auto &infl_transform = in_flight->transform(op, false);
-        in_flight = infl_transform.second;
+        auto infl_transform = in_flight->transform(op, false);
+        in_flight = std::move(infl_transform.second);
 
         if (buffer) {
             // if without doc, only_right_part can be true here
-            const auto &buff_transform = buffer->transform(*infl_transform.first, false);
+            auto buff_transform = buffer->transform(*infl_transform.first, false);
             operation_listener(*buff_transform.first);//            doc->apply(*buff_transform.first);
-            buffer = buff_transform.second;
+            buffer = std::move(buff_transform.second);
         } else {
             operation_listener(*infl_transform.first);//            doc->apply(*infl_transform.first);
         }
@@ -117,14 +107,12 @@ void client::on_receive(const operation &op, const int &new_server_state) {
 symbol client::generate_symbol(const int &value) const {
     assert(client_id != -1 && "Client is not connected");
     const symbol &res = symbol(client_id, free_node_id++, value);
-//    printf("client %d generated symbol %d\n", client_id, res.id);
     return res;
 }
 
-void client::send_to_server(const operation &op, const int &parent_state) {
+void client::send_to_server(const std::shared_ptr<operation> &op, const int &parent_state) {
     assert(peer);
     validate_against_state(*in_flight, *server_doc);
-//    print_operation("client " + std::to_string(client_id) + " sends an operation", op);
     peer->send(client_id, op, parent_state);
 }
 
@@ -133,13 +121,13 @@ int client::id() const {
 }
 
 void client::do_insert(const node_id_t &node_id, const int value) {
-    auto op = std::make_shared<operation>();
+    auto op = std::make_unique<operation>();
     op->insert(node_id, chain(generate_symbol(value)));
     apply_user_op(op);
 }
 
 void client::do_update(const node_id_t &node_id, const int new_value) {
-    auto op = std::make_shared<operation>();
+    auto op = std::make_unique<operation>();
     op->update(node_id, new_value);
     apply_user_op(op);
 }
@@ -168,7 +156,6 @@ void client::do_delete(const node_id_t &node_id) {
             }
         }
     } else {
-        // TODO: я могу все-таки одновременно и в insertions и в deletions ноду держать?
         // it is not in server_doc, which means it is either in in_flight or in buffer
 
         bool found_in_infl = false;
@@ -196,7 +183,11 @@ void client::do_delete(const node_id_t &node_id) {
         }
     }
 
-    auto op = std::make_shared<operation>();
+    auto op = std::make_unique<operation>();
     op->del(node_id, parent_id);
     apply_user_op(op);
+}
+
+void client::set_operation_listener(std::function<void(const operation &)> new_listener) {
+    this->operation_listener = std::move(new_listener);
 }
